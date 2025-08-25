@@ -125,7 +125,7 @@ import "../styles/global.css";
 						<!-- Virtualized list container -->
 						<div
 							id="list"
-							class="relative max-h-[59vh] overflow-auto pr-1 scrollbar-thin scrollbar-thumb-rounded-full scrollbar-track-rounded-full scrollbar-thumb-indigo-600 scrollbar-track-gray-100 dark:scrollbar-thumb-indigo-500 dark:scrollbar-track-gray-800">
+							class="relative max-h-[65vh] overflow-auto pr-1 scrollbar-thin scrollbar-thumb-rounded-full scrollbar-track-rounded-full scrollbar-thumb-indigo-600 scrollbar-track-gray-100 dark:scrollbar-thumb-indigo-500 dark:scrollbar-track-gray-800">
 							<div id="spacer"></div>
 							<div id="viewport" class="absolute inset-0"></div>
 						</div>
@@ -225,7 +225,7 @@ import "../styles/global.css";
 					? `${base.replace(/\/+$/, "")}:${port}`
 					: base.replace(/\/+$/, "");
 			};
-			const buildDirectM3U8 = (id) => {
+			function buildDirectM3U8(id) {
 				const { host, port, user, pass } = getCreds();
 				return (
 					fmtBase(host, port) +
@@ -237,7 +237,7 @@ import "../styles/global.css";
 					encodeURIComponent(id) +
 					".m3u8"
 				);
-			};
+			}
 			const safeHttpUrl = (u) => {
 				try {
 					const x = new URL(u, location.href);
@@ -431,8 +431,7 @@ import "../styles/global.css";
 						user.value,
 						pass.value
 					);
-					const api = `/api/proxy?url=${encodeURIComponent(target)}`;
-					const r = await fetch(api);
+					const r = await fetch(target);
 					const body = await r.text();
 					if (!r.ok) {
 						console.error("Upstream error body:", body);
@@ -554,8 +553,8 @@ import "../styles/global.css";
 
 				epgList.innerHTML = `<div class="text-gray-500">Loading EPG…</div>`;
 				try {
-					const r = await fetch(url); // may CORS-fail
-					if (!r.ok) throw new Error(r.statusText);
+					const r = await fetch(url);
+					if (!r.ok) throw new Error(await r.text());
 					const data = await r.json();
 
 					// Xtream variations: sometimes items live in epg_listings; sometimes root array
