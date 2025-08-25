@@ -8,7 +8,6 @@ import "../styles/global.css";
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>Video Player</title>
-
 		<!-- Video.js CSS -->
 		<link
 			href="https://vjs.zencdn.net/8.23.3/video-js.css"
@@ -97,9 +96,9 @@ import "../styles/global.css";
 			<script>
 				const details = document.getElementById("login-details");
 				if (window.innerWidth >= 640) {
-					details.setAttribute("open", "true");
+					details?.setAttribute("open", "true");
 				} else {
-					details.removeAttribute("open");
+					details?.removeAttribute("open");
 				}
 			</script>
 
