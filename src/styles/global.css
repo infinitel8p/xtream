@@ -4,3 +4,8 @@
 @theme {
     --color-dark: #0b0820;
 }
+:root,
+html,
+body {
+    height: 100%;
+}

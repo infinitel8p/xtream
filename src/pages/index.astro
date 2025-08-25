@@ -1,138 +1,214 @@
 ---
-import "../styles/global.css";
+import Layout from "../layouts/Layout.astro";
 ---
 
-<!doctype html>
-<html lang="en" class="h-full">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>Video Player</title>
-		<!-- Video.js CSS -->
-		<link
-			href="https://vjs.zencdn.net/8.23.3/video-js.css"
-			rel="stylesheet"
-		/>
-	</head>
+<Layout>
 	<body
-		class="max-h-full bg-white text-gray-900 antialiased dark:bg-[#0b0820] dark:text-gray-100">
-		<main class="mx-auto max-w-6xl p-4 md:p-6 lg:p-8">
-			<!-- <header class="mb-6 flex items-end justify-between gap-4">
-				<div>
-					<h1
-						class="text-2xl font-semibold tracking-tight md:text-3xl">
-						Video Player
-					</h1>
-					<p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-						Enter your credentials, click save and load channels.
-						Then click a channel to play it.
-					</p>
-				</div>
-			</header> -->
+		class="min-h-screen bg-gradient-to-br from-[#0b0820] via-[#0d0a29] to-[#111139] text-gray-100 antialiased selection:bg-indigo-500/30">
+		<!-- Decorative background accents -->
+		<div aria-hidden="true" class="pointer-events-none fixed inset-0 -z-10">
+			<div
+				class="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-indigo-600/20 blur-3xl">
+			</div>
+			<div
+				class="absolute -bottom-24 -right-24 h-80 w-80 rounded-full bg-fuchsia-600/20 blur-3xl">
+			</div>
+			<div
+				class="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08),transparent_60%),radial-gradient(ellipse_at_bottom,rgba(168,85,247,0.06),transparent_60%)]">
+			</div>
+		</div>
 
-			<!-- Login bar -->
-			<details
-				id="login-details"
-				class="mb-4 rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-gray-900 shadow-sm">
-				<summary
-					class="flex cursor-pointer items-center justify-between rounded-t-xl px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800">
-					<span>Login</span>
-					<svg
-						class="ml-2 h-4 w-4 transition-transform duration-200 group-open:rotate-180"
-						xmlns="http://www.w3.org/2000/svg"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor">
-						<path
+		<main class="mx-auto max-w-7xl px-4 pb-10 pt-6 md:px-6 lg:px-8">
+			<!-- App Header -->
+			<header
+				class="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+				<div class="flex items-center gap-3">
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-600 shadow-lg shadow-indigo-500/20 ring-1 ring-white/10">
+						<!-- play icon -->
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="24"
+							height="24"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
 							stroke-linecap="round"
 							stroke-linejoin="round"
-							stroke-width="2"
-							d="M19 9l-7 7-7-7"></path>
-					</svg>
-				</summary>
-
-				<div
-					class="px-4 py-3 border-t border-gray-200 dark:border-gray-800">
-					<form
-						id="xtream-login"
-						class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6">
-						<input
-							id="host"
-							autocomplete="off"
-							placeholder="https://panel.example.com"
-							class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-						/>
-						<input
-							id="port"
-							autocomplete="off"
-							placeholder="8080"
-							class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-						/>
-						<input
-							id="user"
-							autocomplete="off"
-							placeholder="username"
-							class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-						/>
-						<input
-							id="pass"
-							autocomplete="off"
-							placeholder="password"
-							type="password"
-							class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-900"
-						/>
-						<button
-							id="saveBtn"
-							type="button"
-							class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-							Save
-						</button>
-						<button
-							id="fetchBtn"
-							type="button"
-							class="rounded-lg border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
-							Load Channels
-						</button>
-					</form>
+							class="size-6 text-white"
+							><path stroke="none" d="M0 0h24v24H0z" fill="none"
+							></path><path
+								d="M9.828 9.172a4 4 0 1 0 0 5.656a10 10 0 0 0 2.172 -2.828a10 10 0 0 1 2.172 -2.828a4 4 0 1 1 0 5.656a10 10 0 0 1 -2.172 -2.828a10 10 0 0 0 -2.172 -2.828"
+							></path></svg
+						>
+					</div>
+					<div>
+						<h1
+							class="text-lg font-semibold tracking-tight md:text-lg">
+							xtream Video Player
+						</h1>
+						<p class="text-xs text-gray-400">
+							Sign in, load channels, and start watching.
+						</p>
+					</div>
 				</div>
-			</details>
+
+				<!-- Login on top right -->
+				<details
+					id="login-details"
+					class="group overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-lg shadow-black/30 backdrop-blur">
+					<summary
+						class="flex cursor-pointer items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-gray-200 hover:bg-white/5">
+						<div class="flex items-center gap-2">
+							<span
+								class="inline-flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-[10px] font-bold text-white shadow ring-1 ring-white/10"
+								>ID</span
+							>
+							<span>Login</span>
+						</div>
+						<svg
+							class="ml-2 h-4 w-4 transition-transform duration-300 group-open:rotate-180"
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M19 9l-7 7-7-7"></path></svg
+						>
+					</summary>
+					<div class="border-t border-white/10 px-4 py-4">
+						<form
+							id="xtream-login"
+							class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6">
+							<input
+								id="host"
+								autocomplete="off"
+								placeholder="https://panel.example.com"
+								class="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
+							/>
+							<input
+								id="port"
+								autocomplete="off"
+								placeholder="8080"
+								class="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
+							/>
+							<input
+								id="user"
+								autocomplete="off"
+								placeholder="username"
+								class="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
+							/>
+							<input
+								id="pass"
+								autocomplete="off"
+								placeholder="password"
+								type="password"
+								class="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
+							/>
+							<button
+								id="saveBtn"
+								type="button"
+								class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-600 px-3 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke-width="1.5"
+									stroke="currentColor"
+									class="h-4 w-4"
+									><path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
+									></path></svg
+								>
+								Save
+							</button>
+							<button
+								id="fetchBtn"
+								type="button"
+								class="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-white/90 shadow-sm backdrop-blur transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+								<svg
+									class="h-4 w-4"
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									><path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="1.5"
+										d="M12 6v12m6-6H6"></path></svg
+								>
+								Load Channels
+							</button>
+						</form>
+					</div>
+				</details>
+			</header>
 
 			<script>
 				const details = document.getElementById("login-details");
 				if (window.innerWidth >= 640) {
-					details?.setAttribute("open", "true");
+					// details?.setAttribute("open", "true");
 				} else {
 					details?.removeAttribute("open");
 				}
 			</script>
 
 			<section
-				class="lg:grid grid-cols-1 gap-4 lg:grid-cols-3 h-full flex flex-col-reverse lg:flex-row">
+				class="lg:grid grid-cols-1 gap-5 lg:grid-cols-3 h-full flex flex-col-reverse lg:flex-row">
 				<!-- Sidebar -->
 				<aside class="lg:col-span-1">
 					<div
-						class="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
-						<label class="sr-only" for="search"
-							>Search channels</label
-						>
-						<input
-							id="search"
-							type="search"
-							placeholder="Search channels…"
-							class="mb-3 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none ring-0 placeholder:text-gray-400 focus:border-transparent focus:ring-2 focus:ring-indigo-500 dark:border-gray-800 dark:bg-gray-950"
-						/>
+						class="rounded-2xl border border-white/10 bg-white/5 p-3 shadow-lg shadow-black/30 backdrop-blur lg:h-full">
+						<div class="mb-3 flex items-center gap-2">
+							<label class="sr-only" for="search"
+								>Search channels</label
+							>
+							<div class="relative w-full">
+								<svg
+									class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+									xmlns="http://www.w3.org/2000/svg"
+									fill="none"
+									viewBox="0 0 24 24"
+									stroke="currentColor"
+									><path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="1.5"
+										d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"
+									></path></svg
+								>
+								<input
+									id="search"
+									type="search"
+									placeholder="Search channels…"
+									class="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
+								/>
+							</div>
+							<button
+								id="clear-search"
+								title="Clear"
+								class="hidden shrink-0 rounded-lg border border-white/10 px-2 py-2 text-xs text-gray-300 hover:bg-white/10"
+								>Clear</button
+							>
+						</div>
 
-						<!-- Virtualized list container -->
 						<div
 							id="list"
-							class="relative max-h-[65vh] overflow-auto pr-1 scrollbar-thin scrollbar-thumb-rounded-full scrollbar-track-rounded-full scrollbar-thumb-indigo-600 scrollbar-track-gray-100 dark:scrollbar-thumb-indigo-500 dark:scrollbar-track-gray-800">
+							class="relative max-h-[calc(100vh-14rem)] overflow-auto pr-1 custom-scroll">
 							<div id="spacer"></div>
 							<div id="viewport" class="absolute inset-0"></div>
 						</div>
 
 						<div
 							id="list-status"
-							class="mt-2 px-2.5 text-sm text-gray-500 dark:text-gray-400">
+							class="mt-2 px-2.5 text-sm text-gray-400">
 							Enter credentials and click “Load Channels”.
 						</div>
 					</div>
@@ -141,25 +217,37 @@ import "../styles/global.css";
 				<!-- Player -->
 				<section class="lg:col-span-2">
 					<div
-						class="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+						class="rounded-2xl border border-white/10 bg-white/5 p-3 shadow-xl shadow-black/30 backdrop-blur">
 						<div
-							class="aspect-video w-full overflow-hidden rounded-xl bg-black flex items-center justify-center">
-							<!-- Video.js player -->
+							class="aspect-video w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
 							<video
 								id="player"
 								class="video-js vjs-default-skin vjs-big-play-centered h-full w-full"
 								controls
 								playsinline></video>
 						</div>
+
 						<div
 							id="current"
-							class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+							class="mt-3 flex items-center justify-between gap-2 text-sm text-gray-300">
+							<div class="flex items-center gap-2">
+								<span
+									class="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-[10px] font-bold text-white ring-1 ring-white/10"
+									>OFF</span
+								>
+								<span class="truncate">—</span>
+							</div>
 						</div>
 
 						<div
 							id="epg"
-							class="mt-3 rounded-xl border border-gray-200 p-3 dark:border-gray-800">
-							<div class="mb-1 text-sm font-medium">EPG</div>
+							class="mt-4 rounded-xl border border-white/10 p-3">
+							<div class="mb-2 flex items-center justify-between">
+								<div class="text-sm font-medium">EPG</div>
+								<div class="text-xs text-gray-400">
+									All times local
+								</div>
+							</div>
 							<div id="epg-list" class="space-y-2 text-sm"></div>
 						</div>
 					</div>
@@ -167,447 +255,54 @@ import "../styles/global.css";
 			</section>
 		</main>
 
-		<!-- Video.js core (includes VHS for HLS/DASH) -->
+		<link
+			rel="stylesheet"
+			href="https://vjs.zencdn.net/8.23.3/video-js.css"
+		/>
 		<script src="https://vjs.zencdn.net/8.23.3/video.min.js"></script>
+		<script type="module" src="../../src/scripts/stream.js"></script>
 
-		<script type="module">
-			// ----------------------------
-			// Cookie helpers
-			// ----------------------------
-			const setCookie = (name, value, days = 365) => {
-				const d = new Date();
-				d.setTime(d.getTime() + days * 864e5);
-				document.cookie =
-					name +
-					"=" +
-					encodeURIComponent(value) +
-					"; expires=" +
-					d.toUTCString() +
-					"; path=/";
-			};
-			const getCookie = (name) => {
-				const m = document.cookie.match(
-					new RegExp(
-						"(?:^|; )" +
-							name.replace(/([.$?*|{}()\[\]\\/+^])/g, "\\$1") +
-							"=([^;]*)"
-					)
+		<style is:global>
+			.custom-scroll::-webkit-scrollbar {
+				width: 8px;
+			}
+			.custom-scroll::-webkit-scrollbar-thumb {
+				background: linear-gradient(
+					180deg,
+					rgba(99, 102, 241, 0.6),
+					rgba(168, 85, 247, 0.6)
 				);
-				return m ? decodeURIComponent(m[1]) : "";
-			};
-
-			// ----------------------------
-			// Creds & URL builders
-			// ----------------------------
-			const getCreds = () => ({
-				host: getCookie("xt_host") || "",
-				port: getCookie("xt_port") || "",
-				user: getCookie("xt_user") || "",
-				pass: getCookie("xt_pass") || "",
-			});
-			const saveCreds = ({ host, port, user, pass }) => {
-				setCookie("xt_host", host || "");
-				setCookie("xt_port", port || "");
-				setCookie("xt_user", user || "");
-				setCookie("xt_pass", pass || "");
-				try {
-					localStorage.setItem("xt_host", host || "");
-					localStorage.setItem("xt_port", port || "");
-					localStorage.setItem("xt_user", user || "");
-					localStorage.setItem("xt_pass", pass || "");
-				} catch {}
-			};
-			const fmtBase = (host, port) => {
-				const base = /^https?:\/\//i.test(host)
-					? host
-					: `http://${host}`;
-				return port && !/:\d+$/.test(base)
-					? `${base.replace(/\/+$/, "")}:${port}`
-					: base.replace(/\/+$/, "");
-			};
-			function buildDirectM3U8(id) {
-				const { host, port, user, pass } = getCreds();
-				return (
-					fmtBase(host, port) +
-					"/live/" +
-					encodeURIComponent(user) +
-					"/" +
-					encodeURIComponent(pass) +
-					"/" +
-					encodeURIComponent(id) +
-					".m3u8"
+				border-radius: 9999px;
+			}
+			.custom-scroll::-webkit-scrollbar-track {
+				background: rgba(255, 255, 255, 0.06);
+				border-radius: 9999px;
+			}
+			.video-js .vjs-big-play-button {
+				border-radius: 0.75rem;
+				border: 1px solid rgba(255, 255, 255, 0.15);
+				background: linear-gradient(
+					135deg,
+					rgba(99, 102, 241, 0.9),
+					rgba(168, 85, 247, 0.9)
 				);
+				box-shadow: 0 10px 30px rgba(99, 102, 241, 0.35);
 			}
-			const safeHttpUrl = (u) => {
-				try {
-					const x = new URL(u, location.href);
-					return /^https?:$/.test(x.protocol) ? x.href : "";
-				} catch {
-					return "";
-				}
-			};
-
-			// ----------------------------
-			// UI refs
-			// ----------------------------
-			const listEl = document.getElementById("list");
-			const spacer = document.getElementById("spacer");
-			const viewport = document.getElementById("viewport");
-			const listStatus = document.getElementById("list-status");
-
-			const searchEl = document.getElementById("search");
-			const currentEl = document.getElementById("current");
-			const f = document.getElementById("xtream-login");
-			const saveBtn = document.getElementById("saveBtn");
-			const fetchBtn = document.getElementById("fetchBtn");
-			const epgList = document.getElementById("epg-list");
-			const $ = (id) => document.getElementById(id);
-
-			// Prefill form
-			const c = getCreds();
-			$("host").value = c.host;
-			$("port").value = c.port;
-			$("user").value = c.user;
-			$("pass").value = c.pass;
-
-			saveBtn.addEventListener("click", (e) => {
-				e.preventDefault();
-				saveCreds({
-					host: $("host").value.trim(),
-					port: $("port").value.trim(),
-					user: $("user").value.trim(),
-					pass: $("pass").value.trim(),
-				});
-				// non-blocking toast-ish
-				listStatus.textContent = "Saved. Click “Load Channels”.";
-			});
-			["host", "port", "user", "pass"].forEach((id) => {
-				$(id).addEventListener("keydown", (e) => {
-					if (e.key === "Enter") e.preventDefault();
-				});
-			});
-
-			// ----------------------------
-			// Channels + Virtualization
-			// ----------------------------
-			/** @type {Array<{id:number,name:string,category?:string,logo?:string|null}>} */
-			let all = [];
-			let filtered = [];
-
-			// Virtual list config
-			const ROW_H = 42; // px; adjust if your row is taller/shorter
-			const OVERSCAN = 8; // extra rows above/below
-			spacer.style.height = "0px";
-
-			let renderScheduled = false;
-
-			function mountVirtualList(items) {
-				filtered = items || [];
-				spacer.style.height = `${filtered.length * ROW_H}px`;
-				renderVirtual();
-			}
-
-			function renderVirtual() {
-				const scrollTop = listEl.scrollTop;
-				const height = listEl.clientHeight;
-
-				const startIdx = Math.max(
-					0,
-					Math.floor(scrollTop / ROW_H) - OVERSCAN
+			.vjs-control-bar {
+				background: linear-gradient(
+					180deg,
+					rgba(17, 17, 57, 0.8),
+					rgba(17, 17, 57, 0.6)
 				);
-				const endIdx = Math.min(
-					filtered.length,
-					Math.ceil((scrollTop + height) / ROW_H) + OVERSCAN
-				);
-
-				// recycle: clear and rebuild the visible slice
-				viewport.innerHTML = "";
-				viewport.style.transform =
-					"translateY(" + startIdx * ROW_H + "px)";
-
-				for (let i = startIdx; i < endIdx; i++) {
-					const ch = filtered[i];
-					const row = document.createElement("button");
-					row.type = "button";
-					row.style.height = ROW_H + "px";
-					row.className =
-						"group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800";
-					row.onclick = () => play(ch.id, ch.name);
-					row.title = ch.name || "";
-
-					// logo
-					const logo = document.createElement("div");
-					logo.className =
-						"h-7 w-7 shrink-0 rounded-md bg-gray-200 dark:bg-gray-700 overflow-hidden ring-1 ring-inset ring-black/5 dark:ring-white/10";
-					if (ch.logo) {
-						const img = document.createElement("img");
-						img.src = safeHttpUrl(ch.logo);
-						img.loading = "lazy";
-						img.referrerPolicy = "no-referrer";
-						img.className = "h-full w-full object-contain";
-						img.onerror = () => {
-							img.remove();
-						};
-						logo.appendChild(img);
-					}
-					row.appendChild(logo);
-
-					// texts
-					const wrap = document.createElement("div");
-					wrap.className = "min-w-0 flex-1";
-					const nameEl = document.createElement("div");
-					nameEl.className = "truncate text-sm font-medium";
-					nameEl.textContent = ch.name || "Stream " + ch.id;
-					const metaEl = document.createElement("div");
-					metaEl.className =
-						"truncate text-xs text-gray-500 dark:text-gray-400";
-					metaEl.textContent = ch.category ?? "";
-					wrap.appendChild(nameEl);
-					wrap.appendChild(metaEl);
-					row.appendChild(wrap);
-
-					viewport.appendChild(row);
-				}
+				backdrop-filter: blur(8px);
 			}
-
-			listEl.addEventListener("scroll", () => {
-				if (!renderScheduled) {
-					renderScheduled = true;
-					requestAnimationFrame(() => {
-						renderScheduled = false;
-						renderVirtual();
-					});
-				}
-			});
-
-			const debounce = (fn, ms = 180) => {
-				let t;
-				return (...args) => {
-					clearTimeout(t);
-					t = setTimeout(() => fn(...args), ms);
-				};
-			};
-			const applyFilter = () => {
-				const q = (searchEl.value || "").toLowerCase().trim();
-				const out = !q
-					? all
-					: all.filter(
-							(ch) =>
-								ch.name.toLowerCase().includes(q) ||
-								(ch.category &&
-									ch.category.toLowerCase().includes(q))
-						);
-				mountVirtualList(out);
-			};
-			searchEl.addEventListener("input", debounce(applyFilter, 160));
-
-			function buildTarget(host, port, user, pass) {
-				// Ensure scheme
-				const baseHost = /^https?:\/\//i.test(host)
-					? host
-					: `http://${host}`;
-				// Put the API path here
-				const apiUrl = new URL(
-					"/player_api.php",
-					baseHost.replace(/\/+$/, "") +
-						(port && !/:\d+$/.test(baseHost) ? `:${port}` : "")
-				);
-				apiUrl.search = new URLSearchParams({
-					username: user,
-					password: pass,
-					action: "get_live_streams",
-				}).toString();
-				return apiUrl.toString();
+			.vjs-play-progress,
+			.vjs-volume-level {
+				background: linear-gradient(90deg, #6366f1, #a855f7) !important;
 			}
-
-			async function loadChannels() {
-				listStatus.textContent = "Loading channels…";
-				spacer.style.height = "0px";
-				viewport.innerHTML = "";
-				try {
-					const target = buildTarget(
-						host.value,
-						port.value,
-						user.value,
-						pass.value
-					);
-					const r = await fetch(target);
-					const body = await r.text();
-					if (!r.ok) {
-						console.error("Upstream error body:", body);
-						throw new Error(`API ${r.status}: ${body}`);
-					}
-					const data = JSON.parse(body);
-					const arr = Array.isArray(data)
-						? data
-						: data?.streams || data?.results || [];
-					all = (arr || [])
-						.map((ch) => ({
-							id: Number(ch.stream_id),
-							name: String(ch.name || ""),
-							category: ch.category_name || "",
-							logo: ch.stream_icon || null,
-						}))
-						.filter((x) => x.id && x.name)
-						.sort((a, b) =>
-							a.name.localeCompare(b.name, "en", {
-								sensitivity: "base",
-							})
-						);
-
-					listStatus.textContent = `${all.length.toLocaleString()} channels`;
-					mountVirtualList(all);
-				} catch (e) {
-					console.error(e);
-					listStatus.textContent =
-						"Failed to load channels (likely CORS). You can still play if you know a stream id.";
-					mountVirtualList([]); // clears list
-				}
+			.vjs-slider {
+				background: rgba(255, 255, 255, 0.15) !important;
 			}
-			fetchBtn.addEventListener("click", loadChannels);
-
-			// ----------------------------
-			// Player (lazy Video.js init)
-			// ----------------------------
-			let vjs = null;
-			const ensurePlayer = () => {
-				if (!vjs) {
-					vjs = videojs("player", {
-						liveui: true,
-						fluid: true,
-						preload: "auto",
-						autoplay: false,
-						aspectRatio: "16:9",
-						controlBar: {
-							volumePanel: { inline: false },
-							pictureInPictureToggle: true,
-							playbackRateMenuButton: false, // IPTV usually live
-							fullscreenToggle: true,
-						},
-						html5: {
-							vhs: {
-								overrideNative: true,
-								limitRenditionByPlayerDimensions: true,
-								smoothQualityChange: true,
-							},
-						},
-					});
-				}
-				return vjs;
-			};
-
-			function play(streamId, name) {
-				const src = buildDirectM3U8(streamId);
-				currentEl.textContent = `Now playing: ${name}`;
-				const player = ensurePlayer();
-				player.src({ src, type: "application/x-mpegURL" });
-				player.play().catch(() => {});
-				loadEPG(streamId);
-			}
-
-			// ----------------------------
-			// EPG (auto base64 decode if needed)
-			// ----------------------------
-			const textDecoder = new TextDecoder("utf-8");
-
-			// Heuristic: looks like base64 and decodes safely => treat as base64
-			function maybeB64ToUtf8(str) {
-				if (!str || typeof str !== "string") return str || "";
-				// quick check: only base64 alphabet + padding and length multiple of 4
-				const looksB64 =
-					/^[A-Za-z0-9+/=\s]+$/.test(str) &&
-					str.replace(/\s+/g, "").length % 4 === 0;
-				if (!looksB64) return str;
-
-				try {
-					const bin = atob(str.replace(/\s+/g, ""));
-					// convert binary string to Uint8Array
-					const bytes = new Uint8Array(bin.length);
-					for (let i = 0; i < bin.length; i++)
-						bytes[i] = bin.charCodeAt(i);
-					const utf8 = textDecoder.decode(bytes);
-					// sanity check: decoded text should contain printable chars
-					if (utf8.replace(/\s/g, "").length === 0) return str;
-					return utf8;
-				} catch {
-					return str;
-				}
-			}
-
-			const fmtTime = (ts) => {
-				const n = Number(ts);
-				if (!Number.isFinite(n)) return "";
-				try {
-					return new Date(n * 1000).toLocaleTimeString([], {
-						hour: "2-digit",
-						minute: "2-digit",
-					});
-				} catch {
-					return "";
-				}
-			};
-
-			async function loadEPG(streamId) {
-				const { host, port, user, pass } = getCreds();
-				const url = `${fmtBase(host, port)}/player_api.php?username=${encodeURIComponent(user)}&password=${encodeURIComponent(pass)}&action=get_short_epg&stream_id=${encodeURIComponent(streamId)}&limit=10`;
-
-				epgList.innerHTML = `<div class="text-gray-500">Loading EPG…</div>`;
-				try {
-					const r = await fetch(url);
-					if (!r.ok) throw new Error(await r.text());
-					const data = await r.json();
-
-					// Xtream variations: sometimes items live in epg_listings; sometimes root array
-					const items = Array.isArray(data?.epg_listings)
-						? data.epg_listings
-						: Array.isArray(data)
-							? data
-							: [];
-					if (!items.length) {
-						epgList.innerHTML = `<div class="text-gray-500">No EPG available.</div>`;
-						return;
-					}
-
-					epgList.innerHTML = items
-						.map((it) => {
-							const start = fmtTime(
-								it.start_timestamp || it.start
-							);
-							const end = fmtTime(it.stop_timestamp || it.end);
-
-							// decode any base64-ish fields
-							const titleRaw = it.title || it.title_raw || "";
-							const descRaw =
-								it.description || it.description_raw || "";
-
-							const title = maybeB64ToUtf8(titleRaw);
-							const desc = maybeB64ToUtf8(descRaw);
-
-							return `
-              <div class="rounded-lg bg-gray-50 p-2 dark:bg-gray-900/50">
-                <div class="flex items-center justify-between">
-                  <div class="font-medium">${title}</div>
-                  <div class="text-xs text-gray-500">${start}–${end}</div>
-                </div>
-                ${desc ? `<div class="mt-1 text-xs text-gray-600 dark:text-gray-400 line-clamp-3">${desc}</div>` : ""}
-              </div>
-            `;
-						})
-						.join("");
-				} catch (e) {
-					console.error(e);
-					epgList.innerHTML = `<div class="text-red-600">Failed to load EPG (CORS or panel error).</div>`;
-				}
-			}
-
-			// Auto-load if creds present
-			if (c.host && c.user && c.pass) loadChannels();
-
-			// Prevent form submit reloads
-			f.addEventListener("submit", (e) => {
-				e.preventDefault();
-				e.stopImmediatePropagation();
-			});
-		</script>
+		</style>
 	</body>
-</html>
+</Layout>
