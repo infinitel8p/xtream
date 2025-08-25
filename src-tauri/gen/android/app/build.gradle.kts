@@ -1,4 +1,5 @@
 import java.util.Properties
+import com.android.build.gradle.internal.cxx.configure.gradleLocalProperties
 
 plugins {
     id("com.android.application")
@@ -8,36 +9,65 @@ plugins {
 
 val tauriProperties = Properties().apply {
     val propFile = file("tauri.properties")
-    if (propFile.exists()) {
-        propFile.inputStream().use { load(it) }
-    }
+    if (propFile.exists()) propFile.inputStream().use { load(it) }
 }
 
+/** Read from user gradle.properties OR environment, fail fast if missing */
+fun required(name: String): String =
+    providers.gradleProperty(name)
+        .orElse(providers.environmentVariable(name))
+        .orNull ?: error("Missing signing property: $name")
+
 android {
-    compileSdk = 36
     namespace = "com.infinitel8p.xtream"
+    compileSdk = 36
+
     defaultConfig {
-        manifestPlaceholders["usesCleartextTraffic"] = "false"
         applicationId = "com.infinitel8p.xtream"
         minSdk = 24
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+        manifestPlaceholders["usesCleartextTraffic"] = "false"
     }
+
+    /** Java/Kotlin 17 toolchains */
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlin {
+        jvmToolchain(17)
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file(required("XTREAM_KEYSTORE_FILE"))
+            storePassword = required("XTREAM_KEYSTORE_PASSWORD")
+            keyAlias = required("XTREAM_KEY_ALIAS")
+            keyPassword = required("XTREAM_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         getByName("debug") {
-            manifestPlaceholders["usesCleartextTraffic"] = "true"
             isDebuggable = true
             isJniDebuggable = true
             isMinifyEnabled = false
-            packaging {                jniLibs.keepDebugSymbols.add("*/arm64-v8a/*.so")
-                jniLibs.keepDebugSymbols.add("*/armeabi-v7a/*.so")
-                jniLibs.keepDebugSymbols.add("*/x86/*.so")
-                jniLibs.keepDebugSymbols.add("*/x86_64/*.so")
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
+            packaging {
+                jniLibs.keepDebugSymbols.add("**/arm64-v8a/*.so")
+                jniLibs.keepDebugSymbols.add("**/armeabi-v7a/*.so")
+                jniLibs.keepDebugSymbols.add("**/x86/*.so")
+                jniLibs.keepDebugSymbols.add("**/x86_64/*.so")
             }
         }
         getByName("release") {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
@@ -45,12 +75,8 @@ android {
             )
         }
     }
-    kotlinOptions {
-        jvmTarget = "1.8"
-    }
-    buildFeatures {
-        buildConfig = true
-    }
+
+    buildFeatures { buildConfig = true }
 }
 
 rust {
