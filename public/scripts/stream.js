@@ -371,6 +371,8 @@ function play(streamId, name) {
         <span class="truncate w-full">Now playing: ${name}</span>
     </div>`;
 
+	const videoEl = document.getElementById("player");
+	videoEl.removeAttribute("hidden");
 	const player = ensurePlayer();
 	player.src({ src, type: "application/x-mpegURL" });
 	player.play().catch(() => {});

@@ -16,6 +16,7 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:hardwareAccelerated="true"
+            android:supportsPictureInPicture="true"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:label="@string/main_activity_title">
             <intent-filter>

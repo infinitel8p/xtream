@@ -24,7 +24,7 @@ import Layout from "../layouts/Layout.astro";
 				class="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
 				<div class="flex items-center gap-3">
 					<div
-						class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-600 shadow-lg shadow-indigo-500/20 ring-1 ring-white/10">
+						class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-600 shadow-lg shadow-indigo-500/20 ring-1 ring-white/10">
 						<!-- play icon -->
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -55,11 +55,9 @@ import Layout from "../layouts/Layout.astro";
 				</div>
 
 				<!-- Login on top right -->
-				<details
-					id="login-details"
-					class="group overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-lg shadow-black/30 backdrop-blur">
+				<details id="login-details" class="group relative">
 					<summary
-						class="flex cursor-pointer items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-gray-200 hover:bg-white/5">
+						class="flex cursor-pointer items-center justify-between gap-2 px-4 py-3 text-sm font-medium text-gray-200 hover:bg-white/5 rounded-2xl border border-white/10 bg-white/5 shadow-lg shadow-black/30 backdrop-blur">
 						<div class="flex items-center gap-2">
 							<span
 								class="inline-flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-[10px] font-bold text-white shadow ring-1 ring-white/10"
@@ -80,92 +78,86 @@ import Layout from "../layouts/Layout.astro";
 								d="M19 9l-7 7-7-7"></path></svg
 						>
 					</summary>
-					<div class="border-t border-white/10 px-4 py-4">
-						<form
-							id="xtream-login"
-							class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-6">
-							<input
-								id="host"
-								autocomplete="off"
-								placeholder="https://panel.example.com"
-								class="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
-							/>
-							<input
-								id="port"
-								autocomplete="off"
-								placeholder="8080"
-								class="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
-							/>
-							<input
-								id="user"
-								autocomplete="off"
-								placeholder="username"
-								class="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
-							/>
-							<input
-								id="pass"
-								autocomplete="off"
-								placeholder="password"
-								type="password"
-								class="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
-							/>
-							<button
-								id="saveBtn"
-								type="button"
-								class="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-600 px-3 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500/40">
-								<svg
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke-width="1.5"
-									stroke="currentColor"
-									class="h-4 w-4"
-									><path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"
-									></path></svg
+
+					<!-- Overlay panel (removed from normal flow) -->
+					<div
+						class="absolute right-0 z-50 mt-2 w-full sm:w-80 hidden group-open:block overflow-hidden rounded-2xl border border-white/10 bg-white/5 shadow-lg shadow-black/30 backdrop-blur">
+						<div class="border-t border-white/10 px-4 py-4">
+							<form
+								id="xtream-login"
+								class="flex flex-col justify-center w-full gap-2">
+								<input
+									id="host"
+									class="h-9 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white placeholder:text-gray-400 outline-none focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
+									placeholder="https://panel.example.com"
+								/>
+								<input
+									id="port"
+									class="h-9 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white placeholder:text-gray-400 outline-none focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
+									placeholder="8080"
+								/>
+								<input
+									id="user"
+									class="h-9 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white placeholder:text-gray-400 outline-none focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
+									placeholder="username"
+								/>
+								<input
+									id="pass"
+									type="password"
+									class="h-9 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white placeholder:text-gray-400 outline-none focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
+									placeholder="password"
+								/>
+								<button
+									id="saveBtn"
+									type="button"
+									class="h-9 px-3 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"
+									>Save</button
 								>
-								Save
-							</button>
-							<button
-								id="fetchBtn"
-								type="button"
-								class="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-white/90 shadow-sm backdrop-blur transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
-								<svg
-									class="h-4 w-4"
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									><path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="1.5"
-										d="M12 6v12m6-6H6"></path></svg
+								<button
+									id="fetchBtn"
+									type="button"
+									class="h-9 px-3 inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 text-sm font-medium text-white/90 shadow-sm backdrop-blur transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+									>Load Channels</button
 								>
-								Load Channels
-							</button>
-						</form>
+							</form>
+						</div>
 					</div>
 				</details>
-			</header>
+				<script>
+					const details = document.getElementById("login-details");
 
-			<script>
-				const details = document.getElementById("login-details");
-				if (window.innerWidth >= 640) {
-					// details?.setAttribute("open", "true");
-				} else {
-					details?.removeAttribute("open");
-				}
-			</script>
+					// Optional: default state on wide screens
+					if (window.innerWidth >= 640) {
+						// details?.setAttribute("open", "true");
+					} else {
+						details?.removeAttribute("open");
+					}
+
+					// Close when clicking outside
+					document.addEventListener("click", (e) => {
+						if (
+							details?.hasAttribute("open") &&
+							!details.contains(e.target)
+						) {
+							details.removeAttribute("open");
+						}
+					});
+
+					// Prevent summary click from bubbling to document
+					details
+						?.querySelector("summary")
+						?.addEventListener("click", (e) => {
+							e.stopPropagation();
+						});
+				</script>
+			</header>
 
 			<section
 				class="lg:grid grid-cols-1 gap-5 lg:grid-cols-3 h-full flex flex-col-reverse lg:flex-row">
 				<!-- Sidebar -->
 				<aside class="lg:col-span-1">
 					<div
-						class="rounded-2xl border border-white/10 bg-white/5 p-3 shadow-lg shadow-black/30 backdrop-blur lg:h-full">
+						class="rounded-2xl border border-white/10 bg-white/1 p-3 shadow-lg shadow-black/30 backdrop-blur lg:h-full">
 						<div class="mb-3 flex items-center gap-2">
 							<label class="sr-only" for="search"
 								>Search channels</label
@@ -217,13 +209,14 @@ import Layout from "../layouts/Layout.astro";
 				<!-- Player -->
 				<section class="lg:col-span-2">
 					<div
-						class="rounded-2xl border border-white/10 bg-white/5 p-3 shadow-xl shadow-black/30 backdrop-blur">
+						class="rounded-2xl border border-white/10 bg-white/1 p-3 shadow-xl shadow-black/30 backdrop-blur">
 						<div
 							class="aspect-video w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10 flex items-center justify-center">
 							<video
 								id="player"
 								class="video-js vjs-default-skin vjs-big-play-centered h-full w-full"
 								controls
+								hidden
 								playsinline></video>
 						</div>
 
