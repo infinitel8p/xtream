@@ -5,9 +5,54 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebView
+import android.webkit.WebSettings
 import android.widget.FrameLayout
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.OnBackPressedCallback
+import android.app.PictureInPictureParams
+import android.util.Rational
+import android.os.Build
+import android.content.res.Configuration
+import android.webkit.JavascriptInterface
+
+class PipBridge(private val activity: TauriActivity) {
+  @JavascriptInterface
+  fun isSupported(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+    activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+
+  @JavascriptInterface
+  fun isInPip(): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && activity.isInPictureInPictureMode
+
+  @JavascriptInterface
+  fun enter() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      activity.runOnUiThread {
+        val params = PictureInPictureParams.Builder()
+          .setAspectRatio(Rational(16, 9))
+          .build()
+        activity.enterPictureInPictureMode(params)
+      }
+    }
+  }
+
+  // Programmatically expand out of PiP by bringing the Activity to the front
+  @JavascriptInterface
+  fun expand() {
+    activity.runOnUiThread {
+      val intent = Intent(activity, MainActivity::class.java)
+        .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+      activity.startActivity(intent)
+    }
+  }
+
+  @JavascriptInterface
+  fun toggle() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+    if (activity.isInPictureInPictureMode) expand() else enter()
+  }
+}
 
 class MainActivity : TauriActivity() {
 
@@ -23,13 +68,20 @@ class MainActivity : TauriActivity() {
     window.decorView.post {
       val webView = findFirstWebView(window.decorView)
       if (webView != null) {
+        webView.addJavascriptInterface(PipBridge(this), "AndroidPip")
         // Helpful while testing from Chrome DevTools:
         WebView.setWebContentsDebuggingEnabled(true)
 
         // Reasonable defaults (tweak as needed)
         webView.settings.javaScriptEnabled = true
         webView.settings.setSupportMultipleWindows(true)
-        webView.settings.mediaPlaybackRequiresUserGesture = true
+
+        // ---- Important bits for your use-case ----
+        // Allow HTTP streams inside WebView (mixed content)
+        webView.settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+        // Allow autoplay without an extra tap (set to true if you want to force a gesture)
+        webView.settings.mediaPlaybackRequiresUserGesture = false
+        // -----------------------------------------
 
         webView.webChromeClient = object : WebChromeClient() {
           override fun onShowCustomView(view: View, callback: CustomViewCallback) {
@@ -85,6 +137,21 @@ class MainActivity : TauriActivity() {
         }
       }
     )
+  }
+
+  // Enter PiP automatically when the user presses Home (Android 8.0+)
+  override fun onUserLeaveHint() {
+    super.onUserLeaveHint()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      val params = PictureInPictureParams.Builder()
+        .setAspectRatio(Rational(16, 9))
+        .build()
+      enterPictureInPictureMode(params)
+    }
+  }
+
+  override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
+    super.onPictureInPictureModeChanged(isInPictureInPictureMode)
   }
 
   /** Depth-first search for the first WebView in the activity’s view tree. */
