@@ -477,7 +477,7 @@ ${
 			.join("");
 	} catch (e) {
 		console.error(e);
-		epgList.innerHTML = `<div class="text-red-600">Failed to load EPG (CORS or panel error).</div>`;
+		epgList.innerHTML = `<div class="text-red-600">Failed to load EPG.</div>`;
 	}
 }
 
