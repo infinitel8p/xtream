@@ -206,7 +206,6 @@ function renderVirtual() {
 		const nameEl = document.createElement("div");
 		nameEl.className = "truncate text-sm font-medium";
         nameEl.textContent = ch.name || "Stream " + ch.id;
-        console.log(ch)
 		const metaEl = document.createElement("div");
 		metaEl.className = "truncate text-xs text-gray-500 dark:text-gray-400";
 		metaEl.textContent = ch.category ?? "";
@@ -326,7 +325,7 @@ async function loadChannels() {
 	} catch (e) {
 		console.error(e);
 		listStatus.textContent =
-			"Failed to load channels (likely CORS). You can still play if you know a stream id.";
+			"Failed to load channels. You can still play if you know a stream id.";
         mountVirtualList([]); // clears list
 	}
 }

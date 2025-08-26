@@ -1,6 +1,6 @@
 {
   "productName": "xtream",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "identifier": "com.infinitel8p.xtream",
   "build": {
     "frontendDist": "../dist",

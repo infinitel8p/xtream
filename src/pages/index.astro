@@ -219,7 +219,7 @@ import Layout from "../layouts/Layout.astro";
 					<div
 						class="rounded-2xl border border-white/10 bg-white/5 p-3 shadow-xl shadow-black/30 backdrop-blur">
 						<div
-							class="aspect-video w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
+							class="aspect-video w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10 flex items-center justify-center">
 							<video
 								id="player"
 								class="video-js vjs-default-skin vjs-big-play-centered h-full w-full"
@@ -260,7 +260,7 @@ import Layout from "../layouts/Layout.astro";
 			href="https://vjs.zencdn.net/8.23.3/video-js.css"
 		/>
 		<script src="https://vjs.zencdn.net/8.23.3/video.min.js"></script>
-		<script type="module" src="../../src/scripts/stream.js"></script>
+		<script type="module" src="/scripts/stream.js"></script>
 
 		<style is:global>
 			.custom-scroll::-webkit-scrollbar {
