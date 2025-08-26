@@ -253,15 +253,11 @@ import Layout from "@/layouts/Layout.astro";
 			</div>
 		</main>
 
-		<link
-			rel="stylesheet"
-			href="https://vjs.zencdn.net/8.23.3/video-js.css"
-		/>
 		<script src="https://vjs.zencdn.net/8.23.3/video.min.js"></script>
-		<script type="module" src="/src/scripts/stream.js"></script>
-		<script type="module" src="/src/scripts/updater-startup.js"></script>
-		<script type="module">
-			import { injectVersion } from "/src/scripts/version.js";
+		<script>
+			import "../scripts/stream.js";
+			import "../scripts/updater-startup.js";
+			import { injectVersion } from "../scripts/version.js";
 			injectVersion();
 		</script>
 	</body>

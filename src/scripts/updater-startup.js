@@ -12,7 +12,7 @@ async function maybeRunWindowsAutoUpdate() {
         const { relaunch } = await import("@tauri-apps/plugin-process");
 
         const update = await check(); 
-        if (update?.available) {
+        if (update !== null) {
             await update.downloadAndInstall(); 
             await relaunch();
         }

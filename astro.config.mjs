@@ -9,10 +9,18 @@ export default defineConfig({
       host: "0.0.0.0", // listen on all interfaces
       port: 4321,
       hmr: {
-        host: "192.168.178.27", // your PC’s LAN IP
+        host: "192.168.178.27",
         protocol: "ws",
         port: 4321,
       },
     },
-  },
+    build: {
+      rollupOptions: {
+        external: [
+          '@tauri-apps/plugin-process',
+          '@tauri-apps/plugin-updater',
+        ],
+      },
+    },
+  }
 });
