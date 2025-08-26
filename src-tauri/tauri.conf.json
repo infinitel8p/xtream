@@ -1,6 +1,6 @@
 {
   "productName": "xtream",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "identifier": "com.infinitel8p.xtream",
   "build": {
     "frontendDist": "../dist",
@@ -32,6 +32,7 @@
     "publisher": "InfiniteL8p",
     "category": "public.app-category.video",
     "copyright": "© 2025 Ludovico Ferrara",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -39,5 +40,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE2NERBRENFQzczNDZENjQKUldSa2JUVEh6cTFOcHJzVi9PYTB0TWZFYUZEV3RrdW5LRk56cmhDcjdxQlJ1QldjbXAwNEVxWHQK",
+      "endpoints": [
+        "https://github.com/infinitel8p/xtream/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

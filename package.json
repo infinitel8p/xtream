@@ -1,7 +1,7 @@
 {
   "name": "xtream",
   "type": "module",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "scripts": {
     "dev": "astro dev --host",
     "build": "astro build",
@@ -14,11 +14,13 @@
   "dependencies": {
     "@astrojs/netlify": "^6.5.8",
     "@tailwindcss/vite": "^4.1.12",
+    "@tauri-apps/plugin-updater": "^2.9.0",
     "astro": "^5.13.3",
     "tailwind-scrollbar": "^4.0.2",
     "tailwindcss": "^4.1.12"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.8.3"
+    "@tauri-apps/cli": "^2.8.3",
+    "tiny-glob": "^0.2.9"
   }
 }

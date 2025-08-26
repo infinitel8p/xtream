@@ -1,0 +1,11 @@
+{
+  "version": "0.2.2",
+  "notes": "Release 0.2.2",
+  "pub_date": "2025-08-26T10:39:47.629Z",
+  "platforms": {
+    "windows-x86_64": {
+      "url": "https://github.com/infinitel8p/xtream/releases/download/v0.2.2/xtream_0.2.2_x64-setup.exe",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSa2JUVEh6cTFOcHRHbVNpaTVBaE9sUzRRWjhxUXhqZFF1K2xQQ3V6TkhCYjhiK05KWlExV2syWjBGOHA3Y2pZUUY1dWI3cFU5d3Y2K2lQTi9qV3hUa3RBWVpNRTNRbkFvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzU2MjA0NTkzCWZpbGU6eHRyZWFtXzAuMi4yX3g2NC1zZXR1cC5leGUKV0xwWFNWQ3ZBYi90RUREOFgwcHd1cVMwc2Ivc01zTUNhUVhVQVo1TVhLdjRjMGFLdWQ4ekNlZHp6Kzh0ZStPTWtNTkRndjZZWnI1MjA2MVZTcGJGQlE9PQo="
+    }
+  }
+}
