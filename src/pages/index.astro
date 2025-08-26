@@ -1,5 +1,5 @@
 ---
-import Layout from "../layouts/Layout.astro";
+import Layout from "@/layouts/Layout.astro";
 ---
 
 <Layout>
@@ -246,6 +246,11 @@ import Layout from "../layouts/Layout.astro";
 					</div>
 				</section>
 			</section>
+			<div
+				id="app-version"
+				class="fixed bottom-2 right-3 text-[11px] text-gray-500 dark:text-gray-400 opacity-70">
+				loading…
+			</div>
 		</main>
 
 		<link
@@ -253,49 +258,10 @@ import Layout from "../layouts/Layout.astro";
 			href="https://vjs.zencdn.net/8.23.3/video-js.css"
 		/>
 		<script src="https://vjs.zencdn.net/8.23.3/video.min.js"></script>
-		<script type="module" src="/scripts/stream.js"></script>
-
-		<style is:global>
-			.custom-scroll::-webkit-scrollbar {
-				width: 8px;
-			}
-			.custom-scroll::-webkit-scrollbar-thumb {
-				background: linear-gradient(
-					180deg,
-					rgba(99, 102, 241, 0.6),
-					rgba(168, 85, 247, 0.6)
-				);
-				border-radius: 9999px;
-			}
-			.custom-scroll::-webkit-scrollbar-track {
-				background: rgba(255, 255, 255, 0.06);
-				border-radius: 9999px;
-			}
-			.video-js .vjs-big-play-button {
-				border-radius: 0.75rem;
-				border: 1px solid rgba(255, 255, 255, 0.15);
-				background: linear-gradient(
-					135deg,
-					rgba(99, 102, 241, 0.9),
-					rgba(168, 85, 247, 0.9)
-				);
-				box-shadow: 0 10px 30px rgba(99, 102, 241, 0.35);
-			}
-			.vjs-control-bar {
-				background: linear-gradient(
-					180deg,
-					rgba(17, 17, 57, 0.8),
-					rgba(17, 17, 57, 0.6)
-				);
-				backdrop-filter: blur(8px);
-			}
-			.vjs-play-progress,
-			.vjs-volume-level {
-				background: linear-gradient(90deg, #6366f1, #a855f7) !important;
-			}
-			.vjs-slider {
-				background: rgba(255, 255, 255, 0.15) !important;
-			}
-		</style>
+		<script type="module" src="/src/scripts/stream.js"></script>
+		<script type="module">
+			import { injectVersion } from "/src/scripts/version.js";
+			injectVersion();
+		</script>
 	</body>
 </Layout>

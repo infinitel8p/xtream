@@ -1,11 +1,59 @@
 @import "tailwindcss";
-@plugin 'tailwind-scrollbar';
+@plugin "tailwind-scrollbar";
 
 @theme {
     --color-dark: #0b0820;
 }
+
 :root,
 html,
 body {
     height: 100%;
+}
+
+/* ────────────────────────────── */
+/* Custom scrollbar styling       */
+/* ────────────────────────────── */
+.custom-scroll::-webkit-scrollbar {
+    width: 8px;
+}
+
+.custom-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg,
+            rgba(99, 102, 241, 0.6),
+            rgba(168, 85, 247, 0.6));
+    border-radius: 9999px;
+}
+
+.custom-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 9999px;
+}
+
+/* ────────────────────────────── */
+/* Video.js overrides             */
+/* ────────────────────────────── */
+.video-js .vjs-big-play-button {
+    border-radius: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: linear-gradient(135deg,
+            rgba(99, 102, 241, 0.9),
+            rgba(168, 85, 247, 0.9));
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.35);
+}
+
+.vjs-control-bar {
+    background: linear-gradient(180deg,
+            rgba(17, 17, 57, 0.8),
+            rgba(17, 17, 57, 0.6));
+    backdrop-filter: blur(8px);
+}
+
+.vjs-play-progress,
+.vjs-volume-level {
+    background: linear-gradient(90deg, #6366f1, #a855f7) !important;
+}
+
+.vjs-slider {
+    background: rgba(255, 255, 255, 0.15) !important;
 }
