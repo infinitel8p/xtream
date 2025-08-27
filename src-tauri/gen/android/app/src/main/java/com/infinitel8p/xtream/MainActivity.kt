@@ -14,6 +14,8 @@ import android.util.Rational
 import android.os.Build
 import android.content.res.Configuration
 import android.webkit.JavascriptInterface
+import android.content.Intent
+import android.content.pm.PackageManager
 
 class PipBridge(private val activity: TauriActivity) {
   @JavascriptInterface
