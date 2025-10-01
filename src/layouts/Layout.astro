@@ -1,64 +1,80 @@
 ---
-import Login from "@/components/Login.astro";
-import { IconInfinity } from "@tabler/icons-svelte";
-import "../styles/global.css";
-import "../styles/video-js.css";
+import Login from "@/components/Login.astro"
+import { IconInfinity } from "@tabler/icons-svelte"
+import "../styles/global.css"
+import "../styles/video-js.css"
 ---
 
 <!doctype html>
 <html lang="en" class="h-full">
-	<head>
-		<meta charset="utf-8" />
-		<meta
-			name="viewport"
-			content="width=device-width, initial-scale=1,viewport-fit=cover"
-		/>
-		<title>Video Player</title>
-		<meta name="theme-color" content="#4f39f6" />
-	</head>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1,viewport-fit=cover"
+    />
+    <title>Video Player</title>
+    <meta name="theme-color" content="#4f39f6" />
+  </head>
 
-	<body
-		class="h-full antialiased bg-[#0b0820] text-gray-100 bg-gradient-to-br from-[#0b0820] via-[#0d0a29] to-[#111139] selection:bg-indigo-500/30 min-h-screen">
-		<header
-			class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mx-auto p-4 md:px-6 lg:px-8 md:landscape:px-8">
-			<div class="flex items-center gap-3">
-				<a
-					href="/"
-					aria-label="Home"
-					class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-600 shadow-lg shadow-indigo-500/20 ring-1 ring-white/10"
-				>	
-					<IconInfinity
-						aria-hidden="true"
-						class="size-6 text-white"
-					/>
-				</a>
-				<div>
-					<h1 class="text-lg font-semibold tracking-tight md:text-lg">
-						xtream Video Player
-					</h1>
-					<p class="text-xs text-gray-400 text-wrap max-w-xs">
-						Sign in with Xtream Codes credentials <em>or</em> load channels
-						directly from an M3U/M3U8 playlist.
-					</p>
-				</div>
-			</div>
+  <body
+    class="h-full antialiased bg-[#0b0820] text-gray-100 bg-gradient-to-br from-[#0b0820] via-[#0d0a29] to-[#111139] selection:bg-indigo-500/30 min-h-screen"
+  >
+    <header
+      class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mx-auto p-4 md:px-6 lg:px-8 md:landscape:px-8"
+    >
+      <div class="flex items-center gap-3">
+        <a
+          href="/"
+          aria-label="Home"
+          class="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-fuchsia-600 shadow-lg shadow-indigo-500/20 ring-1 ring-white/10"
+        >
+          <IconInfinity aria-hidden="true" class="size-6 text-white" />
+        </a>
+        <div>
+          <h1 class="text-lg font-semibold tracking-tight md:text-lg">
+            xtream Video Player
+          </h1>
+          <p class="text-xs text-gray-400 text-wrap max-w-xs">
+            Sign in with Xtream Codes credentials <em>or</em> load channels directly
+            from an M3U/M3U8 playlist.
+          </p>
+        </div>
+      </div>
 
-			<!-- Login on top right -->
-			<Login />
-		</header>
+      <!-- Login on top right -->
+      <Login />
+    </header>
 
-		<slot />
-	</body>
+    <slot />
+  </body>
 </html>
 
 <style is:global>
-	:is(a, button, input, summary):focus {
-		outline: 2px solid #6366f1;
-		outline-offset: 2px;
-	}
+  :is(a, button, input, summary):focus {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+  }
 </style>
 
 <script>
-	import "spatial-navigation-polyfill";
-	import "video.js";
+  import "@/scripts/spatial-navigation"
+  const SpatialNavigation = window.SpatialNavigation
+
+  window.addEventListener("load", function () {
+    // Initialize
+    SpatialNavigation.init()
+
+    // Define navigable elements (anchors and elements with "focusable" class).
+    SpatialNavigation.add({
+      selector:
+        "a, button, summary, input, textarea, [contenteditable='true'], select, [tabindex]:not([tabindex='-1'])",
+    })
+
+    // Make the *currently existing* navigable elements focusable.
+    SpatialNavigation.makeFocusable()
+
+    // Focus the first navigable element.
+    SpatialNavigation.focus()
+  })
 </script>
