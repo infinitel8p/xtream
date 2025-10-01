@@ -35,17 +35,17 @@ async function xfetch(url, opts = {}) {
 // ----------------------------
 const setCookie = (name, value, days = 365) => {
 	try {
-		const d = new Date()
-		d.setTime(d.getTime() + days * 864e5)
-		document.cookie = `${name}=${encodeURIComponent(value)}; expires=${d.toUTCString()}; path=/`
+		const date = new Date()
+		date.setTime(date.getTime() + days * 864e5)
+		document.cookie = `${name}=${encodeURIComponent(value)}; expires=${date.toUTCString()}; path=/`
 	} catch { }
 }
 const getCookie = (name) => {
 	try {
-		const m = document.cookie.match(
+		const match = document.cookie.match(
 			new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') + '=([^;]*)')
     )
-	return m ? decodeURIComponent(m[1]) : ''
+	return match ? decodeURIComponent(match[1]) : ''
 	} catch {
 		return ''
 	}
@@ -148,10 +148,10 @@ function isLikelyM3USource(host, user, pass) {
 	// Treat as M3U when host is an absolute http(s) URL ending with .m3u/.m3u8
 	// and no Xtream credentials are supplied.
 	try {
-		const u = new URL(host);
-		const ext = (u.pathname || "").toLowerCase();
+		const url = new URL(host);
+		const ext = (url.pathname || "").toLowerCase();
 		const isM3U = ext.endsWith(".m3u") || ext.endsWith(".m3u8");
-		return /^https?:$/.test(u.protocol) && isM3U && (!user && !pass);
+		return /^https?:$/.test(url.protocol) && isM3U && (!user && !pass);
 	} catch {
 		return false;
 	}
@@ -272,6 +272,13 @@ saveBtn.addEventListener('click', async (e) => {
 			if (e.key === 'Enter') e.preventDefault()
 		})
 	})
+
+// ! on page load & save creds
+saveBtn.addEventListener('click', () => {
+	loadChannels()
+	const details = document.getElementById('login-details')
+	if (details) details.removeAttribute('open')
+})
 
 // ----------------------------
 // Channels + Virtualization
@@ -609,13 +616,6 @@ async function loadChannels() {
 	}
 }
 
-
-fetchBtn.addEventListener('click', () => {
-	loadChannels()
-	const details = document.getElementById('login-details')
-	if (details) details.removeAttribute('open')
-})
-
 // ----------------------------
 // Player (lazy Video.js init)
 // ----------------------------
@@ -652,7 +652,7 @@ function play(streamId, name) {
 	currentEl.innerHTML = `
     <div class="flex items-center gap-2 max-w-[calc(100%-4rem)]">
       <span class="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-[10px] font-bold text-white ring-1 ring-white/10">ON</span>
-      <span class="truncate w-full">Now playing: ${name}</span>
+      <span class="truncate w-full">Channel ${streamId}: ${name}</span>
     </div>`;
 
 	const videoEl = document.getElementById('player');

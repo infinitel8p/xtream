@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @plugin "tailwind-scrollbar";
 
+
 @theme {
     --color-dark: #0b0820;
 
@@ -62,4 +63,8 @@ body {
 
 .vjs-slider {
     background: rgba(255, 255, 255, 0.15) !important;
+}
+
+@view-transition {
+    navigation: auto;
 }
