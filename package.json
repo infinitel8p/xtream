@@ -18,7 +18,7 @@
     "@tauri-apps/plugin-process": "^2.3.0",
     "@tauri-apps/plugin-store": "^2.4.0",
     "@tauri-apps/plugin-updater": "^2.9.0",
-    "astro": "^5.13.5",
+    "astro": "^5.14.4",
     "tailwind-scrollbar": "^4.0.2",
     "tailwindcss": "^4.1.13"
   },
