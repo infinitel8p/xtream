@@ -1,7 +1,8 @@
 // @ts-check
-import { defineConfig } from 'astro/config';
-import tailwindcss from '@tailwindcss/vite';
+import { defineConfig } from "astro/config"
+import tailwindcss from "@tailwindcss/vite"
 import { optimizeTablerIconsImport } from "./src/plugins/vite-plugin-optimize-tabler-icons.ts"
+import svelte from "@astrojs/svelte"
 
 export default defineConfig({
   vite: {
@@ -17,11 +18,10 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        external: [
-          '@tauri-apps/plugin-process',
-          '@tauri-apps/plugin-updater',
-        ],
+        external: ["@tauri-apps/plugin-process", "@tauri-apps/plugin-updater"],
       },
     },
-  }
-});
+  },
+
+  integrations: [svelte()],
+})
