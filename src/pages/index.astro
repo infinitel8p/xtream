@@ -106,5 +106,12 @@ import Layout from "@/layouts/Layout.astro";
 	import "../scripts/stream.js";
 	import "../scripts/updater-startup.js";
 	import { injectVersion } from "../scripts/version.js";
+	import { injectExpirationDate } from "../scripts/expiration.js";
 	injectVersion();
+	injectExpirationDate(
+		localStorage.getItem("xt_host") || "",
+		localStorage.getItem("xt_port") || "",
+		localStorage.getItem("xt_user") || "",
+		localStorage.getItem("xt_pass") || ""
+	);
 </script>

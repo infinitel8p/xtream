@@ -3281,6 +3281,9 @@ packages:
   space-separated-tokens@2.0.2:
     resolution: {integrity: sha512-PEGlAwrG8yXGXRjW32fGbg66JAlOAwbObuqVoJpv/mRgoWDQfgH1wDPvtzWyUSNAXBGSk8h755YDbbcEy3SH2Q==}
 
+  spatial-navigation-polyfill@1.3.1:
+    resolution: {integrity: sha512-DRLlLNh5t3GUWMtWYZO61rVnygjLvd5xHKj0k6lmebHMge0TDKsLlprahF7SYEdsr6OtHWrxblGwwC/Nn8vD1w==}
+
   spdx-correct@3.2.0:
     resolution: {integrity: sha512-kN9dJbvnySHULIluDHy32WHRUu3Og7B9sbY7tsFLctQkIqnMh3hErYgdMjTYuqmcXX+lK5T1lnUt3G7zNswmZA==}
 
@@ -7666,6 +7669,8 @@ snapshots:
   source-map@0.6.1: {}
 
   space-separated-tokens@2.0.2: {}
+
+  spatial-navigation-polyfill@1.3.1: {}
 
   spdx-correct@3.2.0:
     dependencies:
