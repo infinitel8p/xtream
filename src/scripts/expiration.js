@@ -36,7 +36,7 @@ export async function injectExpirationDate(baseUrl, port="80", username, passwor
             const expirationElement = document.getElementById('account-expiration');
 
             if (expirationElement) {
-                expirationElement.textContent = `Expires: ${formattedDate}`;
+                expirationElement.textContent = `Account expires: ${formattedDate}`;
             } else {
                 console.warn("Element with ID 'account-expiration' not found.");
             }
