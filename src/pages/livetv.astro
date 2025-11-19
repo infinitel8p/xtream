@@ -1,5 +1,4 @@
 ---
-import Login from "@/components/login.astro";
 import Layout from "@/layouts/Layout.astro";
 ---
 
@@ -21,57 +20,19 @@ import Layout from "@/layouts/Layout.astro";
 		<main
 			class="mx-auto px-4 py-10 lg:pt-6 md:landscape:pt-6 md:px-6 lg:px-8 md:landscape:px-8">
 			<section
-				class="lg:grid md:landscape:grid grid-cols-1 gap-5 lg:grid-cols-3 md:landscape:grid-cols-3 h-full flex flex-col-reverse lg:flex-row md:landscape:flex-row">
-				<!-- Sidebar -->
-				<aside class="lg:col-span-1 md:landscape:col-span-1">
-					<div
-						class="rounded-2xl border border-white/10 bg-white/1 p-3 shadow-lg shadow-black/30 backdrop-blur lg:h-full md:landscape:h-full">
-						<div class="mb-3 flex items-center gap-2 flex-wrap">
-							<label class="sr-only" for="search"
-								>Search channels</label
-							>
-							<div class="relative w-full">
-								<svg
-									class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
-									xmlns="http://www.w3.org/2000/svg"
-									fill="none"
-									viewBox="0 0 24 24"
-									stroke="currentColor"
-									><path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="1.5"
-										d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"
-									></path></svg
-								>
-								<input
-									id="search"
-									type="search"
-									placeholder="Search channels…"
-									class="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
-								/>
-							</div>
-							<button
-								id="clear-search"
-								title="Clear"
-								class="hidden shrink-0 rounded-lg border border-white/10 px-2 py-2 text-xs text-gray-300 hover:bg-white/10"
-								>Clear</button
-							>
-						</div>
+				class="lg:grid md:landscape:grid grid-cols-1 gap-5 lg:grid-cols-4 md:landscape:grid-cols-4 h-full flex flex-col-reverse lg:flex-row md:landscape:flex-row">
 
-						<div class="mb-3 relative">
-							<div class="flex items-center gap-2 flex-wrap">
-								<button
-									id="cat-trigger"
-									type="button"
-									class="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition hover:bg-white/10 focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40 flex items-center justify-between">
-									<span
-										id="cat-trigger-label"
-										class="truncate">All categories</span
-									>
+					<!-- categories -->
+					<aside class="lg:col-span-1 md:landscape:col-span-1">
+						<div
+							class="rounded-2xl rounded-r-none border border-white/10 bg-white/1 p-3 shadow-lg shadow-black/30 backdrop-blur lg:h-full md:landscape:h-full">
+							<div class="mb-3 flex items-center gap-2 flex-wrap">
+								<label class="sr-only" for="search"
+									>Search categories</label
+								>
+								<div class="relative w-full">
 									<svg
-										id="cat-trigger-icon"
-										class="ml-2 h-4 w-4 text-gray-400 transition-transform"
+										class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
 										xmlns="http://www.w3.org/2000/svg"
 										fill="none"
 										viewBox="0 0 24 24"
@@ -79,46 +40,96 @@ import Layout from "@/layouts/Layout.astro";
 										><path
 											stroke-linecap="round"
 											stroke-linejoin="round"
-											stroke-width="2"
-											d="M19 9l-7 7-7-7"></path></svg
+											stroke-width="1.5"
+											d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"
+										></path></svg
 									>
-								</button>
+									<input
+										id="category-search"
+										type="search"
+										placeholder="Search categories…"
+										class="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
+									/>
+								</div>
 								<button
-									id="clear-cat"
-									title="Clear category"
-									class="shrink-0 rounded-lg border border-white/10 px-2 py-2 text-xs text-gray-300 hover:bg-white/10">
-									Clear
-								</button>
+									id="category-clear-search"
+									title="Clear"
+									class="hidden shrink-0 rounded-lg border border-white/10 px-2 py-2 text-xs text-gray-300 hover:bg-white/10"
+									>Clear</button
+								>
 							</div>
-							<!-- Popover panel -->
+
 							<div
-								id="cat-popover"
-								class="hidden absolute z-50 mt-2 w-full rounded-2xl border border-white/10 bg-black/85 shadow-lg shadow-black/30 backdrop-blur">
-								<div
-									id="cat-list"
-									role="listbox"
-									class="max-h-[calc(100vh-20rem)] overflow-auto py-2 custom-scroll">
+								id="category-list"
+								class="relative max-h-[calc(100vh-15rem)] overflow-auto pr-1 custom-scroll">
+								<div id="category-spacer"></div>
+								<div id="category-viewport" class="absolute inset-0">
 								</div>
 							</div>
-						</div>
 
-						<div
-							id="list"
-							class="relative max-h-[calc(100vh-20rem)] overflow-auto pr-1 custom-scroll">
-							<div id="spacer"></div>
-							<div id="viewport" class="absolute inset-0"></div>
+							<div
+								id="category-list-status"
+								class="mt-2 px-2.5 text-sm text-gray-400">
+								Enter Xtream Codes credentials and click “Save”, <br />
+								or paste an M3U/M3U8 playlist URL in the Host field
+								(leave user/pass empty).
+							</div>
 						</div>
+					</aside>
+					<!-- channels -->
+					<aside class="lg:col-span-1 md:landscape:col-span-1">
+						<div
+							class="rounded-2xl rounded-l-none border border-white/10 bg-white/1 p-3 shadow-lg shadow-black/30 backdrop-blur lg:h-full md:landscape:h-full">
+							<div class="mb-3 flex items-center gap-2 flex-wrap">
+								<label class="sr-only" for="search"
+									>Search channels</label
+								>
+								<div class="relative w-full">
+									<svg
+										class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+										stroke="currentColor"
+										><path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="1.5"
+											d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z"
+										></path></svg
+									>
+									<input
+										id="search"
+										type="search"
+										placeholder="Search channels…"
+										class="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
+									/>
+								</div>
+								<button
+									id="clear-search"
+									title="Clear"
+									class="hidden shrink-0 rounded-lg border border-white/10 px-2 py-2 text-xs text-gray-300 hover:bg-white/10"
+									>Clear</button
+								>
+							</div>
 
-						<div
-							id="list-status"
-							class="mt-2 px-2.5 text-sm text-gray-400">
-							Enter Xtream Codes credentials and click “Load
-							Channels”, <br />
-							or paste an M3U/M3U8 playlist URL in the Host field (leave
-							user/pass empty).
+							<div
+								id="list"
+								class="relative max-h-[calc(100vh-15rem)] overflow-auto pr-1 custom-scroll">
+								<div id="spacer"></div>
+								<div id="viewport" class="absolute inset-0">
+								</div>
+							</div>
+
+							<div
+								id="list-status"
+								class="mt-2 px-2.5 text-sm text-gray-400">
+								Enter Xtream Codes credentials and click “Save”, <br />
+								or paste an M3U/M3U8 playlist URL in the Host field
+								(leave user/pass empty).
+							</div>
 						</div>
-					</div>
-				</aside>
+					</aside>
 
 				<!-- Player -->
 				<section class="lg:col-span-2 md:landscape:col-span-2">
@@ -167,7 +178,7 @@ import Layout from "@/layouts/Layout.astro";
 			</div>
 			<div
 				id="account-expiration"
-				class="fixed bottom-2 left-3 text-[11px] text-gray-500 dark:text-gray-400 opacity-70">
+				class="fixed top-1 right-3 text-[11px] text-gray-500 dark:text-gray-400 opacity-70">
 				loading…
 			</div>
 		</main>

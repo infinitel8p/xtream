@@ -210,22 +210,15 @@ const viewport = document.getElementById("viewport")
 const listStatus = document.getElementById("list-status")
 
 // Custom category dropdown bits
-const catTrigger = document.getElementById("cat-trigger")
-const catTriggerLabel = document.getElementById("cat-trigger-label")
-const catTriggerIcon = document.getElementById("cat-trigger-icon")
-const catPopover = document.getElementById("cat-popover")
-const catListEl = document.getElementById("cat-list")
-const clearCatBtn = document.getElementById("clear-cat")
+const categoryListEl = document.getElementById("category-list")
+const categoryListStatus = document.getElementById("category-list-status")
+const categorySearchEl = document.getElementById("category-search");
+
 
 let activeCat = ""
 try {
   activeCat = localStorage.getItem("xt_active_cat") || ""
 } catch {}
-
-// initial disabled until categories load
-catTrigger?.classList.add("opacity-60", "cursor-wait")
-clearCatBtn?.classList.add("opacity-60", "cursor-not-allowed")
-clearCatBtn?.setAttribute("disabled", "")
 
 const searchEl = document.getElementById("search")
 const currentEl = document.getElementById("current")
@@ -346,7 +339,7 @@ function renderVirtual() {
     const metaEl = document.createElement("div")
     metaEl.className =
       "truncate text-[0.55rem] text-gray-500 dark:text-gray-400"
-    metaEl.textContent = ch.category ?? ""
+    metaEl.textContent = "#"+ ch.id + " - " + (ch.category ?? "")
     wrap.appendChild(nameEl)
     wrap.appendChild(metaEl)
     row.appendChild(wrap)
@@ -434,7 +427,7 @@ function computeCategoryCounts(items) {
 }
 
 function renderCategoryPicker(items) {
-  if (!catListEl) return
+  if (!categoryListEl) return
   const counts = computeCategoryCounts(items)
   const names = Array.from(counts.keys()).sort((a, b) =>
     a.localeCompare(b, "en", { sensitivity: "base" })
@@ -475,20 +468,16 @@ function renderCategoryPicker(items) {
 
   for (const name of names) addRow(name, name, counts.get(name))
 
-  catListEl.innerHTML = ""
-  catListEl.appendChild(frag)
-
-  // enable controls now
-  catTrigger?.classList.remove("opacity-60", "cursor-wait")
-  clearCatBtn?.classList.remove("opacity-60", "cursor-not-allowed")
-  clearCatBtn?.removeAttribute("disabled")
+  categoryListEl.innerHTML = ""
+  categoryListStatus.textContent = `${names.length.toLocaleString()} categories`
+  categoryListEl.appendChild(frag)
 
   // set/restore current label
   setActiveCat(activeCat)
 
   // local highlight
   function highlightActiveInList() {
-    ;[...catListEl.querySelectorAll('button[role="option"]')].forEach((el) => {
+    ;[...categoryListEl.querySelectorAll('button[role="option"]')].forEach((el) => {
       const selected = (el.dataset.val || "") === activeCat
       el.classList.toggle("bg-white/10", selected)
     })
@@ -496,52 +485,44 @@ function renderCategoryPicker(items) {
   highlightActiveInList()
 }
 
+function filterCategories() {
+  const qnorm = normalize(categorySearchEl.value || "");
+  const tokens = qnorm.length ? qnorm.split(" ") : [];
+
+  const buttons = categoryListEl.querySelectorAll('button[role="option"]');
+  let visibleCount = 0;
+  let totalCount = 0;
+
+  buttons.forEach(btn => {
+    const isAllButton = btn.dataset.val === "";
+    if (!isAllButton) totalCount++; // Count real categories (skip "All categories")
+
+    const label = normalize(btn.dataset.val || btn.textContent || "");
+    const matches =
+      !tokens.length || tokens.every(t => label.includes(t));
+
+    if (matches) {
+      btn.style.display = "";
+      if (!isAllButton) visibleCount++;
+    } else {
+      btn.style.display = "none";
+    }
+  });
+
+  // Update status
+  categoryListStatus.textContent =
+    `${visibleCount.toLocaleString()} of ${totalCount.toLocaleString()} categories`;
+}
+categorySearchEl.addEventListener("input", debounce(filterCategories, 120));
+
 function setActiveCat(next) {
   activeCat = next || ""
   try {
     if (activeCat) localStorage.setItem("xt_active_cat", activeCat)
     else localStorage.removeItem("xt_active_cat")
   } catch {}
-  if (catTriggerLabel)
-    catTriggerLabel.textContent = activeCat || "All categories"
   applyFilter()
 }
-
-function openCatPopover() {
-  if (!catPopover) return
-  catPopover.classList.remove("hidden")
-  catTriggerIcon?.classList.add("rotate-180")
-}
-
-function closeCatPopover() {
-  if (!catPopover) return
-  catPopover.classList.add("hidden")
-  catTriggerIcon?.classList.remove("rotate-180")
-}
-
-function toggleCatPopover() {
-  if (!catPopover) return
-  const open = !catPopover.classList.contains("hidden")
-  open ? closeCatPopover() : openCatPopover()
-}
-
-// global (outside) click to close
-document.addEventListener("click", (e) => {
-  if (!catPopover || !catTrigger) return
-  const t = e.target
-  if (!catPopover.contains(t) && !catTrigger.contains(t)) closeCatPopover()
-})
-// toggle on trigger
-catTrigger?.addEventListener("click", () => {
-  // ignore when disabled during load
-  if (catTrigger.classList.contains("cursor-wait")) return
-  toggleCatPopover()
-})
-// clear button
-clearCatBtn?.addEventListener("click", () => {
-  setActiveCat("")
-  closeCatPopover()
-})
 
 async function loadChannels() {
   creds = await loadCreds()
