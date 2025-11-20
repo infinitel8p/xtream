@@ -22,12 +22,12 @@ import CredsLoader from "../components/CredsLoader.astro";
 			class="mx-auto px-4 py-10 lg:pt-6 md:landscape:pt-6 md:px-6 lg:px-8 md:landscape:px-8">
 			<section
 				class="lg:grid md:landscape:grid grid-cols-1 gap-5 lg:grid-cols-4 md:landscape:grid-cols-4 h-full flex flex-col-reverse lg:flex-row md:landscape:flex-row">
-				<!-- categories -->
+				<!-- Movie categories -->
 				<aside class="lg:col-span-1 md:landscape:col-span-1">
 					<div
 						class="rounded-2xl rounded-r-none border border-white/10 bg-white/1 p-3 shadow-lg shadow-black/30 backdrop-blur lg:h-full md:landscape:h-full">
 						<div class="mb-3 flex items-center gap-2 flex-wrap">
-							<label class="sr-only" for="search"
+							<label class="sr-only" for="movie-category-search"
 								>Search categories</label
 							>
 							<div class="relative w-full">
@@ -45,47 +45,35 @@ import CredsLoader from "../components/CredsLoader.astro";
 									></path></svg
 								>
 								<input
-									id="category-search"
+									id="movie-category-search"
 									type="search"
 									placeholder="Search categories…"
 									class="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
 								/>
 							</div>
-							<button
-								id="category-clear-search"
-								title="Clear"
-								class="hidden shrink-0 rounded-lg border border-white/10 px-2 py-2 text-xs text-gray-300 hover:bg-white/10"
-								>Clear</button
-							>
 						</div>
 
 						<div
-							id="category-list"
+							id="movie-category-list"
 							class="relative max-h-[calc(100vh-15rem)] overflow-auto pr-1 custom-scroll">
-							<div id="category-spacer"></div>
-							<div
-								id="category-viewport"
-								class="absolute inset-0">
-							</div>
+							<!-- buttons injected by JS -->
 						</div>
 
 						<div
-							id="category-list-status"
+							id="movie-category-list-status"
 							class="mt-2 px-2.5 text-sm text-gray-400">
-							Enter Xtream Codes credentials and click “Save”, <br
-							/>
-							or paste an M3U/M3U8 playlist URL in the Host field (leave
-							user/pass empty).
+							Enter Xtream Codes credentials and click “Save”.
 						</div>
 					</div>
 				</aside>
-				<!-- channels -->
+
+				<!-- Movies list -->
 				<aside class="lg:col-span-1 md:landscape:col-span-1">
 					<div
 						class="rounded-2xl rounded-l-none border border-white/10 bg-white/1 p-3 shadow-lg shadow-black/30 backdrop-blur lg:h-full md:landscape:h-full">
 						<div class="mb-3 flex items-center gap-2 flex-wrap">
-							<label class="sr-only" for="search"
-								>Search channels</label
+							<label class="sr-only" for="movie-search"
+								>Search movies</label
 							>
 							<div class="relative w-full">
 								<svg
@@ -102,46 +90,38 @@ import CredsLoader from "../components/CredsLoader.astro";
 									></path></svg
 								>
 								<input
-									id="search"
+									id="movie-search"
 									type="search"
-									placeholder="Search channels…"
+									placeholder="Search movies…"
 									class="w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 py-2 text-sm text-white placeholder:text-gray-400 outline-none ring-0 transition focus:border-indigo-400/30 focus:bg-white/10 focus:ring-2 focus:ring-indigo-500/40"
 								/>
 							</div>
-							<button
-								id="clear-search"
-								title="Clear"
-								class="hidden shrink-0 rounded-lg border border-white/10 px-2 py-2 text-xs text-gray-300 hover:bg-white/10"
-								>Clear</button
-							>
 						</div>
 
 						<div
-							id="list"
+							id="movie-list"
 							class="relative max-h-[calc(100vh-15rem)] overflow-auto pr-1 custom-scroll">
-							<div id="spacer"></div>
-							<div id="viewport" class="absolute inset-0"></div>
+							<div id="movie-spacer"></div>
+							<div id="movie-viewport" class="absolute inset-0">
+							</div>
 						</div>
 
 						<div
-							id="list-status"
+							id="movie-list-status"
 							class="mt-2 px-2.5 text-sm text-gray-400">
-							Enter Xtream Codes credentials and click “Save”, <br
-							/>
-							or paste an M3U/M3U8 playlist URL in the Host field (leave
-							user/pass empty).
+							Enter Xtream Codes credentials and click “Save”.
 						</div>
 					</div>
 				</aside>
 
-				<!-- Player -->
+				<!-- Player + details -->
 				<section class="lg:col-span-2 md:landscape:col-span-2">
 					<div
 						class="rounded-2xl border border-white/10 bg-white/1 p-3 shadow-xl shadow-black/30 backdrop-blur">
 						<div
 							class="aspect-video w-full overflow-hidden rounded-xl bg-black ring-1 ring-white/10 flex items-center justify-center">
 							<video
-								id="player"
+								id="movie-player"
 								class="video-js vjs-default-skin vjs-big-play-centered h-full w-full"
 								controls
 								hidden
@@ -149,31 +129,40 @@ import CredsLoader from "../components/CredsLoader.astro";
 						</div>
 
 						<div
-							id="current"
+							id="movie-current"
 							class="mt-3 flex items-center justify-between gap-2 text-sm text-gray-300">
 							<div class="flex items-center gap-2">
 								<span
 									class="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-fuchsia-600 text-[10px] font-bold text-white ring-1 ring-white/10"
 									>OFF</span
 								>
-								<span class="truncate">—</span>
+								<span class="truncate">No movie selected</span>
 							</div>
 						</div>
 
 						<div
-							id="epg"
-							class="mt-4 rounded-xl border border-white/10 p-3">
-							<div class="mb-2 flex items-center justify-between">
-								<div class="text-sm font-medium">EPG</div>
-								<div class="text-xs text-gray-400">
-									All times local
+							id="movie-details"
+							class="mt-4 rounded-xl border border-white/10 p-3 text-sm text-gray-200">
+							<div
+								class="flex flex-wrap items-center justify-between gap-2 mb-2">
+								<div class="font-medium text-base">Details</div>
+								<div
+									id="movie-meta"
+									class="text-xs text-gray-400 space-x-2">
+									<!-- year / duration / rating injected -->
 								</div>
 							</div>
-							<div id="epg-list" class="space-y-2 text-sm"></div>
+							<div
+								id="movie-plot"
+								class="text-xs text-gray-300 leading-relaxed">
+								Select a movie to see its description, year,
+								duration, and more.
+							</div>
 						</div>
 					</div>
 				</section>
 			</section>
+
 			<div
 				id="app-version"
 				class="fixed bottom-2 right-3 text-[11px] text-gray-500 dark:text-gray-400 opacity-70">
@@ -187,7 +176,7 @@ import CredsLoader from "../components/CredsLoader.astro";
 		</main>
 
 		<script>
-			import "../scripts/stream/stream.js";
+			import "../scripts/movies/movies.js";
 			import "../scripts/updater-startup.js";
 			import { injectVersion } from "../scripts/version.js";
 			import { injectExpirationDate } from "../scripts/expiration.js";

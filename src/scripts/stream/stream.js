@@ -15,18 +15,6 @@ if (isTauri) {
   store = await Store.load(".xtream.creds.json")
 }
 
-// ----------------------------
-// Cookie helpers
-// ----------------------------
-const setCookie = (name, value, days = 365) => {
-  try {
-    const date = new Date()
-    date.setTime(date.getTime() + days * 864e5)
-    document.cookie = `${name}=${encodeURIComponent(
-      value
-    )}; expires=${date.toUTCString()}; path=/`
-  } catch {}
-}
 const getCookie = (name) => {
   try {
     const match = document.cookie.match(
@@ -61,34 +49,13 @@ async function loadCreds() {
   }
 }
 
-async function saveCreds(next) {
-  creds = { ...creds, ...next }
-  categoryMap = null
-  if (isTauri && store) {
-    await store.set("host", creds.host || "")
-    await store.set("port", creds.port || "")
-    await store.set("user", creds.user || "")
-    await store.set("pass", creds.pass || "")
-    await store.save()
-  }
-  try {
-    setCookie("xt_host", creds.host || "")
-    setCookie("xt_port", creds.port || "")
-    setCookie("xt_user", creds.user || "")
-    setCookie("xt_pass", creds.pass || "")
-    localStorage.setItem("xt_host", creds.host || "")
-    localStorage.setItem("xt_port", creds.port || "")
-    localStorage.setItem("xt_user", creds.user || "")
-    localStorage.setItem("xt_pass", creds.pass || "")
-  } catch {}
-}
-
 const fmtBase = (host, port) => {
   const base = /^https?:\/\//i.test(host) ? host : `http://${host}`
   return port && !/:\d+$/.test(base)
     ? `${base.replace(/\/+$/, "")}:${port}`
     : base.replace(/\/+$/, "")
 }
+
 function buildDirectM3U8(id) {
   const { host, port, user, pass } = creds
   return (
@@ -224,40 +191,15 @@ const searchEl = document.getElementById("search")
 const currentEl = document.getElementById("current")
 const f = document.getElementById("xtream-login")
 const saveBtn = document.getElementById("saveBtn")
-const fetchBtn = document.getElementById("fetchBtn")
 const epgList = document.getElementById("epg-list")
 const $ = (id) => document.getElementById(id)
-const hostEl = $("host")
-const portEl = $("port")
-const userEl = $("user")
-const passEl = $("pass")
 
-// Prefill form
-creds = await loadCreds()
-hostEl.value = creds.host
-portEl.value = creds.port
-userEl.value = creds.user
-passEl.value = creds.pass
-
-saveBtn.addEventListener("click", async (e) => {
-  e.preventDefault()
-  console.log("Saving creds…")
-  await saveCreds({
-    host: hostEl.value.trim(),
-    port: portEl.value.trim(),
-    user: userEl.value.trim(),
-    pass: passEl.value.trim(),
-  })
-  listStatus.textContent =
-    "Saved. Tip: paste an M3U/M3U8 URL into the Host field (leave user/pass empty) to load a playlist. Then click “Load Channels”."
-})
 ;["host", "port", "user", "pass"].forEach((id) => {
   $(id).addEventListener("keydown", (e) => {
     if (e.key === "Enter") e.preventDefault()
   })
 })
 
-// ! on page load & save creds
 saveBtn.addEventListener("click", () => {
   loadChannels()
   const details = document.getElementById("login-details")
@@ -526,6 +468,7 @@ function setActiveCat(next) {
 
 async function loadChannels() {
   creds = await loadCreds()
+  categoryListStatus.textContent = "Loading categories…"
   listStatus.textContent = "Loading channels…"
   spacer.style.height = "0px"
   viewport.innerHTML = ""

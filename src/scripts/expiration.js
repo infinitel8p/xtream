@@ -1,5 +1,4 @@
 export async function injectExpirationDate(baseUrl, port="80", username, password) {
-    console.log(baseUrl, port, username, password);
     const apiUrl = `${baseUrl}:${port}/player_api.php?username=${username}&password=${password}`;
 
     try {
