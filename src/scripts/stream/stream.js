@@ -172,7 +172,6 @@ function getDirectUrl(id) {
 // UI refs
 // ----------------------------
 const listEl = document.getElementById("list")
-const spacer = document.getElementById("spacer")
 const viewport = document.getElementById("viewport")
 const listStatus = document.getElementById("list-status")
 
@@ -218,44 +217,19 @@ let categoryMap = null
 
 const hiddenCats = new Set()
 
-// Virtual list config
-const ROW_H = 50
-const OVERSCAN = 8
-spacer.style.height = "0px"
-
-let renderScheduled = false
-
-function mountVirtualList(items) {
+function mountList(items) {
   filtered = items || []
-  spacer.style.height = `${filtered.length * ROW_H}px`
-  renderVirtual()
-}
 
-function renderVirtual() {
-  const scrollTop = listEl.scrollTop
-  const height = listEl.clientHeight
-
-  const startIdx = Math.max(0, Math.floor(scrollTop / ROW_H) - OVERSCAN)
-  const endIdx = Math.min(
-    filtered.length,
-    Math.ceil((scrollTop + height) / ROW_H) + OVERSCAN
-  )
-
-  // recycle: clear and rebuild the visible slice
   viewport.innerHTML = ""
-  viewport.style.transform = "translateY(" + startIdx * ROW_H + "px)"
 
-  for (let i = startIdx; i < endIdx; i++) {
-    const ch = filtered[i]
+  for (const ch of filtered) {
     const row = document.createElement("button")
     row.type = "button"
-    row.style.height = ROW_H + "px"
     row.className =
       "group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left hover:bg-white/5"
     row.onclick = () => play(ch.id, ch.name)
     row.title = ch.name || ""
 
-    // logo
     const logo = document.createElement("div")
     logo.className =
       "h-7 w-7 shrink-0 rounded-md bg-gray-200 dark:bg-gray-700 overflow-hidden ring-1 ring-inset ring-black/5 dark:ring-white/10"
@@ -265,40 +239,24 @@ function renderVirtual() {
       img.loading = "lazy"
       img.referrerPolicy = "no-referrer"
       img.className = "h-full w-full object-contain"
-      img.onerror = () => {
-        img.remove()
-      }
+      img.onerror = () => img.remove()
       logo.appendChild(img)
     }
     row.appendChild(logo)
 
-    // texts
     const wrap = document.createElement("div")
     wrap.className = "min-w-0 flex-1"
-    const nameEl = document.createElement("div")
-    nameEl.className = "truncate text-sm font-medium"
-    nameEl.textContent = ch.name || "Stream " + ch.id
-    const metaEl = document.createElement("div")
-    metaEl.className =
-      "truncate text-[0.55rem] text-gray-500 dark:text-gray-400"
-    metaEl.textContent = "#"+ ch.id + " - " + (ch.category ?? "")
-    wrap.appendChild(nameEl)
-    wrap.appendChild(metaEl)
+    wrap.innerHTML = `
+      <div class="truncate text-sm font-medium">${ch.name}</div>
+      <div class="truncate text-[0.55rem] text-gray-500 dark:text-gray-400">
+        #${ch.id} - ${ch.category ?? ""}
+      </div>
+    `
     row.appendChild(wrap)
 
     viewport.appendChild(row)
   }
 }
-
-listEl.addEventListener("scroll", () => {
-  if (!renderScheduled) {
-    renderScheduled = true
-    requestAnimationFrame(() => {
-      renderScheduled = false
-      renderVirtual()
-    })
-  }
-})
 
 const debounce = (fn, ms = 180) => {
   let t
@@ -335,7 +293,7 @@ const applyFilter = () => {
   })
 
   listStatus.textContent = `${out.length.toLocaleString()} of ${all.length.toLocaleString()} channels`
-  mountVirtualList(out)
+  mountList(out)
 }
 
 searchEl.addEventListener("input", debounce(applyFilter, 160))
@@ -385,7 +343,7 @@ function renderCategoryPicker(items) {
     btn.setAttribute("role", "option")
     btn.dataset.val = val
     btn.className = [
-      "w-full px-3 py-2 text-sm flex items-center justify-between",
+      "w-full py-2 px-2 text-sm flex items-center justify-between",
       "hover:bg-white/10 focus:bg-white/10 outline-none",
       "text-white",
     ].join(" ")
@@ -470,7 +428,6 @@ async function loadChannels() {
   creds = await loadCreds()
   categoryListStatus.textContent = "Loading categories…"
   listStatus.textContent = "Loading channels…"
-  spacer.style.height = "0px"
   viewport.innerHTML = ""
   usingM3U = isLikelyM3USource(creds.host, creds.user, creds.pass)
 
@@ -493,7 +450,7 @@ async function loadChannels() {
 
       listStatus.textContent = `${all.length.toLocaleString()} channels (M3U)`
       renderCategoryPicker(all)
-      mountVirtualList(all)
+      mountList(all)
       return
     }
 
@@ -543,12 +500,12 @@ async function loadChannels() {
     resetDirectMap() // ensure we're not in direct-url mode
     listStatus.textContent = `${all.length.toLocaleString()} channels`
     renderCategoryPicker(all)
-    mountVirtualList(all)
+    mountList(all)
   } catch (e) {
     console.error(e)
     listStatus.innerHTML =
       "<p>Failed to load channels. Make sure you entered a valid Xtream service <em>or</em> an accessible M3U/M3U8 URL in the Host field.<br/><br/>We do not provide any streams or content ourselves.</p>"
-    mountVirtualList([]) // clears list
+    mountList([]) // clears list
   }
 }
 
