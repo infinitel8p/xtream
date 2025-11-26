@@ -425,6 +425,7 @@ function setActiveCat(next) {
 }
 
 async function loadChannels() {
+  console.log("Loading channels...");
   creds = await loadCreds()
   categoryListStatus.textContent = "Loading categories…"
   listStatus.textContent = "Loading channels…"
@@ -433,6 +434,7 @@ async function loadChannels() {
 
   try {
     if (usingM3U) {
+      console.log("Detected M3U source, loading as M3U...")
       // --- M3U MODE ---
       const r = await fetch(creds.host)
       if (!r.ok) throw new Error(`M3U ${r.status}: ${await r.text()}`)
@@ -455,6 +457,7 @@ async function loadChannels() {
     }
 
     // --- XTREAM MODE (original path) ---
+    console.log("Detected Xtream source, loading as Xtream...");
     const catMap = await ensureCategoryMap()
     const r = await fetch(buildApiUrl("get_live_streams"))
     const body = await r.text()
@@ -499,6 +502,7 @@ async function loadChannels() {
 
     resetDirectMap() // ensure we're not in direct-url mode
     listStatus.textContent = `${all.length.toLocaleString()} channels`
+    console.log("Loaded channels:", all.length);
     renderCategoryPicker(all)
     mountList(all)
   } catch (e) {
