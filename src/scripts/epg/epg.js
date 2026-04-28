@@ -5,6 +5,8 @@ import {
   fmtBase,
   buildApiUrl,
   isLikelyM3USource,
+  normalize,
+  debounce,
 } from "@/scripts/lib/creds.js"
 import { getCached } from "@/scripts/lib/cache.js"
 import { fetchAndMaybeGunzip } from "@/scripts/lib/network.js"
@@ -24,6 +26,15 @@ const headerInner = document.getElementById("epg-time-header-inner")
 const bodyEl = document.getElementById("epg-body")
 const titleEl = document.getElementById("epg-title")
 const refreshBtn = document.getElementById("epg-refresh")
+const categoryLabelEl = document.getElementById("epg-category-label")
+const categoryListEl = document.getElementById("epg-category-list")
+const categoryListStatus = document.getElementById("epg-category-list-status")
+const categorySearchEl = /** @type {HTMLInputElement|null} */ (
+  document.getElementById("epg-category-search")
+)
+const categoryDialog = /** @type {HTMLDialogElement|null} */ (
+  document.getElementById("epg-category-dialog")
+)
 
 // ----------------------------
 // State
@@ -34,6 +45,8 @@ let activePlaylistId = ""
 let activeCat = ""
 /** @type {Array<{id:number,name:string,logo?:string|null,tvgId?:string,category?:string}>} */
 let channels = []
+/** @type {Array<{id:number,name:string,logo?:string|null,tvgId?:string,category?:string}>} */
+let allChannels = []
 /** @type {Map<string, Array<{start:number,stop:number,title:string,desc:string}>>} channel id (tvg-id, lower-cased) → sorted programmes */
 const programmes = new Map()
 let viewStart = 0
@@ -103,10 +116,6 @@ function parseXmlTv(xml) {
     arr.push({ start, stop, title, desc })
   }
 
-  // Sort and dedupe overlapping programmes per channel. Some providers ship
-  // duplicate or near-duplicate programmes (regenerated EPGs that don't
-  // replace, just append) — without this, two cells stack at the same
-  // (left, width) and the titles render on top of each other.
   for (const arr of programmes.values()) {
     arr.sort((a, b) => a.start - b.start)
     let lastStop = -Infinity
@@ -290,7 +299,6 @@ function render() {
   bodyEl.replaceChildren(frag)
   renderNowLine()
 
-  // Add a tail "+ N more" hint if we capped channel count.
   if (channels.length === MAX_CHANNELS) {
     const tail = document.createElement("div")
     tail.className = "p-3 text-fg-3 text-xs text-center"
@@ -315,14 +323,6 @@ function pickChannels(cachedChannels) {
   return withEpg.slice(0, MAX_CHANNELS)
 }
 
-/**
- * Re-fetch the live channel list directly from the Xtream API. Mirrors the
- * shape stream.js produces (id, name, category, logo, tvgId), but doesn't
- * write to the cache — the assumption is that we're here precisely because
- * the cache write previously failed (quota). One round-trip for categories,
- * one for streams; most providers reply in under a second even for 50k+
- * channel libraries.
- */
 async function fetchXtreamChannels() {
   // Categories first so we can resolve `category_id → name` for streams.
   const catRes = await fetch(buildApiUrl(creds, "get_live_categories"))
@@ -405,6 +405,126 @@ async function loadEpgXml() {
   return fetchAndMaybeGunzip(url)
 }
 
+// ----------------------------
+// Category picker
+// ----------------------------
+function syncCategoryUI() {
+  if (titleEl) {
+    titleEl.textContent = activeCat
+      ? `EPG · ${activeCat}`
+      : "EPG · All categories"
+  }
+  if (categoryLabelEl) {
+    categoryLabelEl.textContent = activeCat || "All categories"
+  }
+  if (categoryListEl) {
+    for (const el of categoryListEl.querySelectorAll('button[role="option"]')) {
+      el.classList.toggle("bg-surface-2", (el.dataset.val || "") === activeCat)
+    }
+  }
+}
+
+function setActiveCat(next) {
+  const cleaned = next || ""
+  if (cleaned === activeCat) {
+    syncCategoryUI()
+    return
+  }
+  activeCat = cleaned
+  try {
+    if (activeCat) localStorage.setItem("xt_active_cat", activeCat)
+    else localStorage.removeItem("xt_active_cat")
+  } catch {}
+  syncCategoryUI()
+  document.dispatchEvent(
+    new CustomEvent("xt:cat-changed", { detail: activeCat })
+  )
+  applyCategory()
+}
+
+function applyCategory() {
+  if (!allChannels.length) return
+  channels = pickChannels(allChannels)
+  if (!channels.length) {
+    showStatus(
+      "No channels in this category have EPG ids (`tvg-id`). Try a different category."
+    )
+    return
+  }
+  if (!programmes.size) {
+    showStatus(
+      "EPG loaded, but no programmes matched any channel id. Provider might use different `tvg-id`s than the playlist."
+    )
+    return
+  }
+  render()
+}
+
+function renderCategoryPicker(items) {
+  if (!categoryListEl) return
+  const counts = new Map()
+  for (const ch of items) {
+    if (!ch.tvgId) continue
+    const k = (ch.category || "").trim() || "Uncategorized"
+    counts.set(k, (counts.get(k) || 0) + 1)
+  }
+  const names = Array.from(counts.keys()).sort((a, b) =>
+    a.localeCompare(b, "en", { sensitivity: "base" })
+  )
+  const frag = document.createDocumentFragment()
+
+  const addRow = (val, label, count = null) => {
+    const btn = document.createElement("button")
+    btn.type = "button"
+    btn.setAttribute("role", "option")
+    btn.dataset.val = val
+    btn.className =
+      "w-full py-2 px-2 text-sm flex items-center justify-between hover:bg-surface-2 focus:bg-surface-2 outline-none text-fg"
+    const left = document.createElement("span")
+    left.className = "truncate"
+    left.textContent = label
+    const right = document.createElement("span")
+    right.className =
+      "category-count ml-3 shrink-0 text-xs text-fg-3 tabular-nums"
+    right.textContent = count != null ? String(count) : ""
+    btn.append(left, right)
+    btn.addEventListener("click", () => setActiveCat(val))
+    frag.appendChild(btn)
+    return btn
+  }
+
+  addRow("", "All categories")
+  for (const name of names) addRow(name, name, counts.get(name))
+
+  categoryListEl.replaceChildren(frag)
+  if (categoryListStatus) {
+    categoryListStatus.textContent = `${names.length.toLocaleString()} categories`
+  }
+  syncCategoryUI()
+}
+
+function filterCategories() {
+  if (!categoryListEl || !categoryListStatus || !categorySearchEl) return
+  const qnorm = normalize(categorySearchEl.value || "")
+  const tokens = qnorm.length ? qnorm.split(" ") : []
+
+  let visibleCount = 0
+  let totalCount = 0
+
+  for (const btn of categoryListEl.querySelectorAll('button[role="option"]')) {
+    const isAllButton = btn.dataset.val === ""
+    if (!isAllButton) totalCount++
+    const label = normalize(btn.dataset.val || btn.textContent || "")
+    const matches = !tokens.length || tokens.every((t) => label.includes(t))
+    btn.style.display = matches ? "" : "none"
+    if (matches && !isAllButton) visibleCount++
+  }
+
+  categoryListStatus.textContent = `${visibleCount.toLocaleString()} of ${totalCount.toLocaleString()} categories`
+}
+
+categorySearchEl?.addEventListener("input", debounce(filterCategories, 120))
+
 async function init() {
   showStatus("Loading…")
 
@@ -428,11 +548,7 @@ async function init() {
   const isSentinelCat =
     activeCat === "__favorites__" || activeCat === "__recents__"
   if (isSentinelCat) activeCat = ""
-  if (titleEl) {
-    titleEl.textContent = activeCat
-      ? `EPG · ${activeCat}`
-      : "EPG · All categories"
-  }
+  syncCategoryUI()
 
   const isM3U = isLikelyM3USource(creds.host, creds.user, creds.pass)
   let cached =
@@ -455,6 +571,9 @@ async function init() {
     }
   }
 
+  allChannels = cached
+  renderCategoryPicker(allChannels)
+
   channels = pickChannels(cached)
   if (!channels.length) {
     showStatus(
@@ -467,7 +586,7 @@ async function init() {
     roundHalfHourFloor(Date.now() - 30 * 60 * 1000),
     roundHalfHourFloor(Date.now())
   )
-  // Allow ~30 min of "what just ended" to remain visible.
+
   viewStart = roundHalfHourFloor(Date.now() - 30 * 60 * 1000)
 
   showStatus("Loading EPG (this can take a moment for large providers)…")
@@ -498,15 +617,31 @@ refreshBtn?.addEventListener("click", () => {
   init()
 })
 
-// Re-render every minute so the now-line creeps right and the live highlight
-// rolls onto the next programme.
 setInterval(() => {
   if (programmes.size && channels.length) renderNowLine()
 }, 60 * 1000)
 
 document.addEventListener("xt:active-changed", () => {
   programmes.clear()
+  allChannels = []
   init()
+})
+
+document.addEventListener("xt:cat-changed", (e) => {
+  const next = /** @type {CustomEvent} */ (e).detail || ""
+  const cleaned =
+    next === "__favorites__" || next === "__recents__" ? "" : next
+  if (cleaned === activeCat) return
+  activeCat = cleaned
+  syncCategoryUI()
+  applyCategory()
+})
+
+categoryDialog?.addEventListener("close", () => {
+  if (categorySearchEl) {
+    categorySearchEl.value = ""
+    filterCategories()
+  }
 })
 
 init()

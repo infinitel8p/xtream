@@ -91,6 +91,7 @@ async function writeRaw(data) {
     localStorage.setItem(STORAGE_KEY, json)
     setCookie(STORAGE_KEY, json)
   } catch {}
+  migrationPromise = Promise.resolve(data)
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +128,6 @@ async function clearLegacy() {
 
 function legacyToEntry({ host, port, user, pass }) {
   if (!host) return null
-  // M3U: absolute http(s) URL ending in .m3u/.m3u8 with no creds.
   try {
     const u = new URL(host)
     const ext = (u.pathname || "").toLowerCase()
@@ -141,8 +141,8 @@ function legacyToEntry({ host, port, user, pass }) {
         addedAt: Date.now(),
       }
     }
-  } catch {}
-  // Xtream: combine host + port into a serverUrl.
+  } catch { }
+
   const serverUrl = composeServerUrl(host, port)
   return {
     _id: uuid(),
@@ -235,11 +235,8 @@ export async function removeEntry(id) {
   let selectedId = s.selectedId
   if (selectedId === id) selectedId = remaining[0]?._id || ""
   await writeRaw({ entries: remaining, selectedId })
-  // Drop any cached channel/VOD lists for this playlist.
   const { invalidateEntry } = await import("./cache.js")
   invalidateEntry(id)
-  // Drop favorites + recents for this playlist (xtream_rust pattern: per-source
-  // entries don't outlive their source).
   const { clearForPlaylist } = await import("./preferences.js")
   clearForPlaylist(id)
   dispatch(EVT_ENTRIES_UPDATED)
@@ -250,7 +247,6 @@ export async function updateEntry(id, patch) {
   const s = await getState()
   const next = s.entries.map((e) => (e._id === id ? { ...e, ...patch } : e))
   await writeRaw({ ...s, entries: next })
-  // Edited creds may not produce the same channel list - drop caches.
   const { invalidateEntry } = await import("./cache.js")
   invalidateEntry(id)
   dispatch(EVT_ENTRIES_UPDATED)
@@ -355,10 +351,6 @@ function composeServerUrl(host, port) {
 // Form helpers (for /login page)
 // ---------------------------------------------------------------------------
 
-/**
- * Inspect a pasted URL. If it's a `?username=&password=` query, return the
- * extracted creds. Used to auto-populate the form on paste (iptvnator-style).
- */
 export function parseXtreamUrl(input) {
   if (!input) return null
   let url

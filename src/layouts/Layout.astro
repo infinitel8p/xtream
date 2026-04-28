@@ -1,6 +1,5 @@
 ---
-import PlaylistSwitcher from "@/components/PlaylistSwitcher.astro"
-import { IconInfinity } from "@tabler/icons-svelte"
+import Sidebar from "@/components/Sidebar.astro"
 import "../styles/global.css"
 
 interface Props {
@@ -23,6 +22,13 @@ const documentTitle = pageTitle
     <title>{documentTitle}</title>
     <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0e1628" media="(prefers-color-scheme: dark)" />
+    <script is:inline>
+      try {
+        var s = parseFloat(localStorage.getItem("xt_font_scale") || "1");
+        if (!isFinite(s) || s < 0.75 || s > 2) s = 1;
+        document.documentElement.style.fontSize = (16 * s) + "px";
+      } catch (e) {}
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -32,36 +38,17 @@ const documentTitle = pageTitle
   </head>
 
   <body
-    class="antialiased bg-bg text-fg selection:bg-accent-soft min-h-screen flex flex-col pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+    class="antialiased bg-bg text-fg selection:bg-accent-soft min-h-screen
+           flex flex-row pr-[env(safe-area-inset-right)]"
   >
-    <header
-      class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between p-4 md:px-6 lg:px-8 md:landscape:px-8"
-    >
-      <div class="flex items-center gap-3">
-        <a
-          href="/"
-          aria-label="Home"
-          class="[view-transition-name:brand-mark] flex size-10 items-center justify-center rounded-xl bg-accent ring-1 ring-line"
-        >
-          <IconInfinity aria-hidden="true" class="size-6 text-bg" />
-        </a>
-        <div>
-          <h1 class="[view-transition-name:wordmark] text-lg font-semibold tracking-tight">
-            Extreme InfiniTV
-          </h1>
-        </div>
-      </div>
-
-      <PlaylistSwitcher />
-    </header>
-
-    <slot />
+    <Sidebar />
+    <div class="flex-1 min-w-0 min-h-0 flex flex-col">
+      <slot />
+    </div>
   </body>
 </html>
 
 <style is:global>
-  /* Reduce-motion respect: kill the chevron rotation and other transforms
-     (dropdown opens still work, just instant). */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -77,8 +64,6 @@ const documentTitle = pageTitle
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
-  /* Larger viewports = TVs and large desktops viewed from further away.
-     Bump the focus ring so it reads at 10 ft. */
   @media (min-width: 64rem) {
     :is(a, button, input, summary, [tabindex]):focus-visible {
       outline-width: 3px;
@@ -97,19 +82,15 @@ const documentTitle = pageTitle
   )
 
   window.addEventListener("load", function () {
-    // Initialize
     SpatialNavigation.init()
 
-    // Define navigable elements (anchors and elements with "focusable" class).
     SpatialNavigation.add({
       selector:
         "a, button, summary, input, textarea, [contenteditable='true'], select, [tabindex]:not([tabindex='-1'])",
     })
 
-    // Make the *currently existing* navigable elements focusable.
     SpatialNavigation.makeFocusable()
 
-    // Focus the first navigable element.
     SpatialNavigation.focus()
   })
 </script>

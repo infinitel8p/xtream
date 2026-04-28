@@ -1,0 +1,370 @@
+---
+import Layout from "@/layouts/Layout.astro"
+import {
+  IconRefresh,
+  IconTrash,
+  IconAlertTriangle,
+  IconExternalLink,
+} from "@tabler/icons-svelte"
+---
+
+<Layout pageTitle="Settings">
+  <main
+    class="w-full max-w-3xl mx-auto px-4 md:px-6 lg:px-8 pt-4 lg:pt-6 pb-6
+           flex flex-col gap-6 flex-1 min-h-0 overflow-auto custom-scroll">
+
+    <header class="shrink-0">
+      <h1 class="text-xl font-semibold tracking-tight">Settings</h1>
+      <p class="text-sm text-fg-3 mt-1">
+        Manage your playlists, cache, and app data.
+      </p>
+    </header>
+
+    <!-- Active playlist -->
+    <section class="rounded-2xl border border-line bg-surface p-4 flex flex-col gap-3">
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-base font-semibold">Active playlist</h2>
+        <span
+          id="settings-active-badge"
+          class="hidden h-5 px-1.5 items-center justify-center rounded-md text-label font-semibold uppercase ring-1 ring-line text-fg-2">
+        </span>
+      </div>
+      <div
+        id="settings-active-name"
+        class="text-sm text-fg-2 truncate">
+        No playlist selected.
+      </div>
+      <div
+        id="settings-active-host"
+        class="text-xs text-fg-3 truncate font-mono">
+      </div>
+      <div class="flex flex-wrap gap-2 pt-1">
+        <a
+          href="/login"
+          class="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm
+                 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent
+                 transition-colors">
+          <IconExternalLink aria-hidden="true" class="size-4" />
+          Add playlists
+        </a>
+        <button
+          id="settings-refresh-active"
+          type="button"
+          class="hidden inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm
+                 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent
+                 transition-colors">
+          <IconRefresh aria-hidden="true" class="size-4" />
+          Refresh active
+        </button>
+      </div>
+    </section>
+
+    <!-- Display: font scale (TV-distance knob) -->
+    <section class="rounded-2xl border border-line bg-surface p-4 flex flex-col gap-3">
+      <h2 class="text-base font-semibold">Display</h2>
+      <p class="text-xs text-fg-3">
+        Bumps the base font size for everything. Use Large or X-Large when
+        viewing on a TV from across the room.
+      </p>
+      <div
+        id="settings-font-scale"
+        class="flex flex-wrap gap-2"
+        role="radiogroup"
+        aria-label="Font scale">
+        <button type="button" data-scale="1"     class="font-scale-btn rounded-xl border border-line px-3 py-2 text-sm hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent transition-colors">Default</button>
+        <button type="button" data-scale="1.125" class="font-scale-btn rounded-xl border border-line px-3 py-2 text-sm hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent transition-colors">Medium</button>
+        <button type="button" data-scale="1.25"  class="font-scale-btn rounded-xl border border-line px-3 py-2 text-sm hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent transition-colors">Large</button>
+        <button type="button" data-scale="1.5"   class="font-scale-btn rounded-xl border border-line px-3 py-2 text-sm hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent transition-colors">X-Large</button>
+      </div>
+    </section>
+
+    <!-- Storage / cache -->
+    <section class="rounded-2xl border border-line bg-surface p-4 flex flex-col gap-3">
+      <h2 class="text-base font-semibold">Storage</h2>
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div class="flex flex-col gap-0.5">
+          <span class="text-fg-3 text-xs uppercase tracking-wide">Cache</span>
+          <span id="settings-cache-size" class="text-fg tabular-nums">—</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-fg-3 text-xs uppercase tracking-wide">Newest entry</span>
+          <span id="settings-cache-newest" class="text-fg tabular-nums">—</span>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-2 pt-1">
+        <button
+          id="settings-clear-cache"
+          type="button"
+          class="inline-flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm
+                 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent
+                 transition-colors">
+          <IconTrash aria-hidden="true" class="size-4" />
+          Clear cache
+        </button>
+        <span id="settings-cache-msg" class="text-xs text-fg-3 self-center"></span>
+      </div>
+      <p class="text-xs text-fg-3">
+        Clears channel/movie/series lists. Playlists, favorites, and recents are kept.
+      </p>
+    </section>
+
+    <!-- Danger zone -->
+    <section class="rounded-2xl border border-bad/40 bg-surface p-4 flex flex-col gap-3">
+      <div class="flex items-center gap-2">
+        <IconAlertTriangle aria-hidden="true" class="size-4 text-bad" />
+        <h2 class="text-base font-semibold text-bad">Reset everything</h2>
+      </div>
+      <p class="text-sm text-fg-2">
+        Wipes <span class="text-fg">all</span> app data: playlists, cached lists,
+        favorites, recents, and locally stored EPG references. The next launch
+        starts from a clean slate as if the app was just installed.
+      </p>
+      <div class="flex flex-wrap gap-2">
+        <button
+          id="settings-reset-all"
+          type="button"
+          class="inline-flex items-center gap-2 rounded-xl border border-bad/50 px-3 py-2 text-sm text-bad
+                 hover:bg-bad/10 focus-visible:bg-bad/10 focus-visible:border-bad
+                 transition-colors">
+          <IconTrash aria-hidden="true" class="size-4" />
+          Reset everything
+        </button>
+        <span id="settings-reset-msg" class="text-xs text-fg-3 self-center"></span>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section class="rounded-2xl border border-line bg-surface p-4 flex flex-col gap-3">
+      <h2 class="text-base font-semibold">About</h2>
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div class="flex flex-col gap-0.5">
+          <span class="text-fg-3 text-xs uppercase tracking-wide">Version</span>
+          <span id="app-version" class="text-fg tabular-nums">—</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-fg-3 text-xs uppercase tracking-wide">Account expires</span>
+          <span id="account-expiration" class="text-fg tabular-nums">—</span>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    import { Store } from "@tauri-apps/plugin-store"
+    import {
+      getActiveEntry,
+      refreshActive,
+      isTauri,
+    } from "@/scripts/lib/creds.js"
+    import { getNewestCacheTime } from "@/scripts/lib/cache.js"
+    import { injectVersion } from "@/scripts/version.js"
+    import { injectExpirationDate } from "@/scripts/expiration.js"
+
+    // Inject the same version + expiration helpers that the other pages use.
+    // Both helpers target hardcoded IDs (`app-version`, `account-expiration`)
+    // which we match in the markup above.
+    injectVersion()
+    injectExpirationDate()
+
+    const activeNameEl = document.getElementById("settings-active-name")
+    const activeHostEl = document.getElementById("settings-active-host")
+    const activeBadgeEl = document.getElementById("settings-active-badge")
+    const refreshBtn = document.getElementById("settings-refresh-active")
+    const cacheSizeEl = document.getElementById("settings-cache-size")
+    const cacheNewestEl = document.getElementById("settings-cache-newest")
+    const cacheMsgEl = document.getElementById("settings-cache-msg")
+    const clearCacheBtn = document.getElementById("settings-clear-cache")
+    const resetBtn = document.getElementById("settings-reset-all")
+    const resetMsgEl = document.getElementById("settings-reset-msg")
+
+    function fmtAge(ts) {
+      if (!ts) return "—"
+      const ms = Date.now() - ts
+      const m = Math.floor(ms / 60_000)
+      if (m < 60) return `${m}m ago`
+      const h = Math.floor(m / 60)
+      if (h < 24) return `${h}h ago`
+      const d = Math.floor(h / 24)
+      return `${d}d ago`
+    }
+
+    function fmtBytes(n) {
+      if (n < 1024) return `${n} B`
+      if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+      return `${(n / (1024 * 1024)).toFixed(1)} MB`
+    }
+
+    async function syncActive() {
+      const a = await getActiveEntry()
+      if (!a) {
+        if (activeNameEl) activeNameEl.textContent = "No playlist selected."
+        if (activeHostEl) activeHostEl.textContent = ""
+        if (activeBadgeEl) {
+          activeBadgeEl.classList.add("hidden")
+          activeBadgeEl.classList.remove("inline-flex")
+        }
+        refreshBtn?.classList.add("hidden")
+        refreshBtn?.classList.remove("inline-flex")
+        return
+      }
+      if (activeNameEl) activeNameEl.textContent = a.title
+      if (activeHostEl) {
+        activeHostEl.textContent =
+          a.type === "xtream"
+            ? `${a.serverUrl} · ${a.username}`
+            : a.url
+      }
+      if (activeBadgeEl) {
+        activeBadgeEl.textContent = a.type === "xtream" ? "XT" : "M3U"
+        activeBadgeEl.classList.remove("hidden")
+        activeBadgeEl.classList.add("inline-flex")
+      }
+      refreshBtn?.classList.remove("hidden")
+      refreshBtn?.classList.add("inline-flex")
+    }
+
+    function syncCache() {
+      let bytes = 0
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i)
+          if (!k || !k.startsWith("xt_cache:")) continue
+          const v = localStorage.getItem(k) || ""
+          // Approximate — UTF-16 code units in localStorage; doubling gives
+          // closer-to-actual byte count.
+          bytes += k.length + v.length * 2
+        }
+      } catch {}
+      if (cacheSizeEl) cacheSizeEl.textContent = fmtBytes(bytes)
+
+      let newest = null
+      ;(async () => {
+        const a = await getActiveEntry()
+        if (a) newest = getNewestCacheTime(a._id)
+        if (cacheNewestEl) cacheNewestEl.textContent = fmtAge(newest)
+      })()
+    }
+
+    refreshBtn?.addEventListener("click", async () => {
+      refreshBtn.setAttribute("disabled", "")
+      try {
+        await refreshActive()
+      } finally {
+        refreshBtn.removeAttribute("disabled")
+        syncCache()
+      }
+    })
+
+    clearCacheBtn?.addEventListener("click", () => {
+      try {
+        const toRemove = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i)
+          if (k && (k.startsWith("xt_cache:") || k === "xt_cache_meta"))
+            toRemove.push(k)
+        }
+        for (const k of toRemove) localStorage.removeItem(k)
+        if (cacheMsgEl) cacheMsgEl.textContent = `Cleared ${toRemove.length} entries.`
+      } catch (e) {
+        if (cacheMsgEl) cacheMsgEl.textContent = "Couldn't clear cache."
+      }
+      syncCache()
+    })
+
+    resetBtn?.addEventListener("click", async () => {
+      const ok = confirm(
+        "This wipes ALL app data: playlists, favorites, recents, and cached lists. Continue?"
+      )
+      if (!ok) return
+
+      // localStorage + sessionStorage + cookies wipe
+      try {
+        localStorage.clear()
+      } catch {}
+      try {
+        sessionStorage.clear()
+      } catch {}
+      try {
+        const all = document.cookie.split(";")
+        for (const c of all) {
+          const eq = c.indexOf("=")
+          const name = (eq > -1 ? c.slice(0, eq) : c).trim()
+          if (!name) continue
+          document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`
+        }
+      } catch {}
+
+      // Tauri plugin-store: wipe the creds.json keys we own.
+      if (isTauri) {
+        try {
+          const store = await Store.load(".xtream.creds.json")
+          // Drop all keys (covers playlists + prefs which both share this store).
+          const keys = await store.keys()
+          for (const k of keys) await store.delete(k)
+          await store.save()
+        } catch (e) {
+          console.warn("Tauri store reset failed:", e)
+        }
+      }
+
+      if (resetMsgEl) resetMsgEl.textContent = "Reset complete. Reloading…"
+      // Hard reload so module-level caches in stream.js / movies.js / etc. are
+      // re-initialised from the now-empty stores.
+      setTimeout(() => {
+        window.location.href = "/"
+      }, 400)
+    })
+
+    document.addEventListener("xt:active-changed", () => {
+      syncActive()
+      syncCache()
+    })
+    document.addEventListener("xt:entries-updated", () => {
+      syncActive()
+      syncCache()
+    })
+
+    syncActive()
+    syncCache()
+
+    // ---------------------------------------------------------------------
+    // Font scale — applied inline in <head> on every page load (see
+    // Layout.astro). Here we just expose the picker UI and persist changes.
+    // ---------------------------------------------------------------------
+    const fontScaleGroup = document.getElementById("settings-font-scale")
+    function readFontScale() {
+      const s = parseFloat(localStorage.getItem("xt_font_scale") || "1")
+      return Number.isFinite(s) && s >= 0.75 && s <= 2 ? s : 1
+    }
+    function applyFontScale(s) {
+      document.documentElement.style.fontSize = `${16 * s}px`
+      try {
+        if (s === 1) localStorage.removeItem("xt_font_scale")
+        else localStorage.setItem("xt_font_scale", String(s))
+      } catch {}
+      syncFontScaleButtons()
+    }
+    function syncFontScaleButtons() {
+      const current = readFontScale()
+      for (const btn of fontScaleGroup?.querySelectorAll(".font-scale-btn") ||
+        []) {
+        const v = parseFloat(btn.dataset.scale || "1")
+        const isActive = Math.abs(v - current) < 0.001
+        btn.classList.toggle("bg-surface-2", isActive)
+        btn.classList.toggle("border-accent", isActive)
+        btn.classList.toggle("text-fg", isActive)
+        btn.setAttribute("aria-pressed", String(isActive))
+      }
+    }
+    fontScaleGroup?.addEventListener("click", (e) => {
+      const t = /** @type {HTMLElement} */ (e.target)
+      const btn = t.closest(".font-scale-btn")
+      if (!btn) return
+      const v = parseFloat(btn.dataset.scale || "1")
+      if (!Number.isFinite(v)) return
+      applyFontScale(v)
+    })
+    syncFontScaleButtons()
+  </script>
+</Layout>

@@ -1,0 +1,112 @@
+---
+import {
+  IconInfinity,
+  IconHome,
+  IconDeviceTv,
+  IconMovie,
+  IconStack2,
+  IconCalendarTime,
+  IconSettings,
+} from "@tabler/icons-svelte"
+import PlaylistSwitcher from "@/components/PlaylistSwitcher.astro"
+
+const path = Astro.url.pathname.replace(/\/$/, "") || "/"
+
+const items = [
+  { href: "/",        label: "Home",    Icon: IconHome,         match: (p) => p === "/" },
+  { href: "/livetv",  label: "Live TV", Icon: IconDeviceTv,     match: (p) => p === "/livetv" || p.startsWith("/livetv/") },
+  { href: "/movies",  label: "Movies",  Icon: IconMovie,        match: (p) => p === "/movies" || p.startsWith("/movies/") },
+  { href: "/series",  label: "Series",  Icon: IconStack2,       match: (p) => p === "/series" || p.startsWith("/series/") },
+  { href: "/epg",     label: "EPG",     Icon: IconCalendarTime, match: (p) => p === "/epg" || p.startsWith("/epg/") },
+]
+
+const settingsActive = path === "/settings" || path.startsWith("/settings/")
+---
+
+<aside
+  class="shrink-0 flex flex-col gap-2 border-r border-line bg-bg
+         w-16 lg:w-64
+         p-2 lg:p-3
+         pl-[max(0.5rem,env(safe-area-inset-left))]
+         pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+
+  <!-- Brand mark (also a Home link) -->
+  <a
+    href="/"
+    aria-label="Extreme InfiniTV — Home"
+    class="[view-transition-name:brand-mark]
+           flex items-center gap-3 rounded-xl px-2 py-2
+           hover:bg-surface-2 focus-visible:bg-surface-2
+           transition-colors">
+    <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent ring-1 ring-line">
+      <IconInfinity aria-hidden="true" class="size-5 text-bg" />
+    </span>
+    <span class="hidden lg:inline truncate text-sm font-semibold tracking-tight text-fg">
+      Extreme InfiniTV
+    </span>
+  </a>
+
+  <!-- Primary nav -->
+  <nav class="flex flex-col gap-1 flex-1 mt-2" aria-label="Main">
+    {items.map(({ href, label, Icon, match }) => {
+      const active = match(path)
+      return (
+        <a
+          href={href}
+          aria-label={label}
+          aria-current={active ? "page" : undefined}
+          title={label}
+          class:list={[
+            "flex items-center gap-3 rounded-xl px-2.5 py-2.5 min-h-11",
+            "transition-colors outline-none",
+            "hover:bg-surface-2 focus-visible:bg-surface-2",
+            active
+              ? "bg-surface-2 text-fg ring-1 ring-accent/40"
+              : "text-fg-2 hover:text-fg focus-visible:text-fg",
+          ]}>
+          <Icon
+            aria-hidden="true"
+            stroke={active ? 2 : 1.75}
+            class:list={[
+              "size-5 shrink-0",
+              active ? "text-accent" : "text-fg-3",
+            ]}
+          />
+          <span class="hidden lg:inline truncate text-sm font-medium">
+            {label}
+          </span>
+        </a>
+      )
+    })}
+  </nav>
+
+  <!-- Footer block: playlist switcher + settings -->
+  <div class="flex flex-col gap-1 pt-2 border-t border-line">
+    <PlaylistSwitcher />
+    <a
+      href="/settings"
+      aria-label="Settings"
+      aria-current={settingsActive ? "page" : undefined}
+      title="Settings"
+      class:list={[
+        "flex items-center gap-3 rounded-xl px-2.5 py-2.5 min-h-11",
+        "transition-colors outline-none",
+        "hover:bg-surface-2 focus-visible:bg-surface-2",
+        settingsActive
+          ? "bg-surface-2 text-fg ring-1 ring-accent/40"
+          : "text-fg-2 hover:text-fg focus-visible:text-fg",
+      ]}>
+      <IconSettings
+        aria-hidden="true"
+        stroke={settingsActive ? 2 : 1.75}
+        class:list={[
+          "size-5 shrink-0",
+          settingsActive ? "text-accent" : "text-fg-3",
+        ]}
+      />
+      <span class="hidden lg:inline truncate text-sm font-medium">
+        Settings
+      </span>
+    </a>
+  </div>
+</aside>

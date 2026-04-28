@@ -2,44 +2,44 @@
 import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 ---
 
-<div class="[view-transition-name:playlist-switcher]">
+<div data-ps-wrap class="relative [view-transition-name:playlist-switcher]">
 	<button
 		id="ps-trigger"
 		type="button"
-		popovertarget="ps-popover"
 		aria-haspopup="menu"
 		aria-controls="ps-popover"
-		class="flex w-full sm:w-auto items-center justify-between gap-3 px-3.5 py-2.5 min-h-11 rounded-xl border border-line bg-surface text-sm font-medium text-fg transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent">
+		aria-expanded="false"
+		title="Switch playlist"
+		class="flex w-full items-center gap-2.5 px-2.5 py-2.5 min-h-11 rounded-xl border border-line bg-surface text-sm font-medium text-fg transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent
+			justify-center lg:justify-between">
 		<span class="flex items-center gap-2.5 min-w-0">
 			<span
 				id="ps-badge"
-				class="hidden h-5 px-1.5 items-center justify-center rounded-md text-label font-semibold uppercase text-fg-2 ring-1 ring-line">
+				class="hidden h-5 px-1.5 items-center justify-center rounded-md text-label font-semibold uppercase text-fg-2 ring-1 ring-line shrink-0">
 			</span>
 			<span
 				id="ps-title"
-				class="truncate max-w-56 tracking-tight text-fg-3">
+				class="hidden lg:inline truncate tracking-tight text-fg-3">
 				No playlist
 			</span>
 		</span>
 		<IconChevronDown
 			aria-hidden="true"
-			class="h-4 w-4 text-fg-3 shrink-0 transition-transform duration-200"
+			class="hidden lg:block h-4 w-4 text-fg-3 shrink-0 transition-transform duration-200"
 			id="ps-chevron"
 		/>
 	</button>
 
 	<div
 		id="ps-popover"
-		popover="auto"
 		role="menu"
 		aria-labelledby="ps-trigger"
-		class="ps-popover m-0 p-0 fixed
-			w-[min(22rem,calc(100vw-1rem))]
+		hidden
+		class="ps-popover
 			max-h-[min(70dvh,32rem)]
-			rounded-2xl border border-line bg-surface text-fg
-			shadow-xl shadow-black/40
+			rounded-t-xl border border-line border-b-0 bg-surface text-fg
 			overflow-hidden
-			data-[open=true]:flex data-[open=true]:flex-col">
+			shadow-[0_-12px_28px_-8px_rgba(0,0,0,0.45)]">
 		<div
 			id="ps-list"
 			class="flex-1 min-h-0 overflow-auto custom-scroll py-2">
@@ -50,20 +50,20 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 			<button
 				id="ps-refresh"
 				type="button"
-				class="hidden flex-1 items-center justify-center gap-2 px-3.5 py-3 text-sm font-medium text-fg-2
+				class="hidden flex-1 items-center justify-center gap-1.5 px-2 py-3 text-sm font-medium text-fg-2 whitespace-nowrap
 					hover:text-fg hover:bg-surface-2
 					focus-visible:text-fg focus-visible:bg-surface-2
 					min-h-11 transition-colors outline-none border-r border-line">
-				<IconRefresh aria-hidden="true" class="h-4 w-4" />
+				<IconRefresh aria-hidden="true" class="h-4 w-4 shrink-0" />
 				Refresh
 			</button>
 			<a
 				href="/login"
-				class="flex flex-1 items-center justify-center gap-2 px-3.5 py-3 text-sm font-medium text-fg
+				class="flex flex-1 items-center justify-center gap-1.5 px-2 py-3 text-sm font-medium text-fg whitespace-nowrap
 					hover:bg-surface-2
 					focus-visible:bg-surface-2
 					min-h-11 transition-colors">
-				<IconPlus aria-hidden="true" class="h-4 w-4 text-accent" />
+				<IconPlus aria-hidden="true" class="h-4 w-4 text-accent shrink-0" />
 				Add playlist
 			</a>
 		</div>
@@ -71,16 +71,25 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 </div>
 
 <style>
-	#ps-popover {
+	#ps-popover[hidden] {
 		display: none;
 	}
-	#ps-popover:popover-open {
+	[data-ps-wrap][data-open="true"] #ps-popover {
 		display: flex;
 		flex-direction: column;
+		position: absolute;
+		bottom: 100%;
+		left: 0;
+		right: 0;
+		z-index: 50;
 	}
-	#ps-trigger[aria-expanded="true"] #ps-chevron,
-	#ps-popover:popover-open ~ #ps-trigger #ps-chevron {
+	#ps-trigger[aria-expanded="true"] #ps-chevron {
 		transform: rotate(180deg);
+	}
+	#ps-trigger[aria-expanded="true"] {
+		border-top-left-radius: 0;
+		border-top-right-radius: 0;
+		background-color: var(--color-surface-2);
 	}
 </style>
 
@@ -111,6 +120,9 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 		return `${d}d ago`;
 	}
 
+	const wrap = /** @type {HTMLElement|null} */ (
+		document.querySelector("[data-ps-wrap]")
+	);
 	const trigger = /** @type {HTMLButtonElement|null} */ (
 		document.getElementById("ps-trigger")
 	);
@@ -123,7 +135,78 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 	const badgeEl = document.getElementById("ps-badge");
 	const refreshBtn = document.getElementById("ps-refresh");
 
-	const closePopover = () => popover?.hidePopover?.();
+	let isOpen = false;
+	const SECTION_ID = "ps-popover-section";
+	let sectionRegistered = false;
+
+	function openPopover() {
+		if (!wrap || !popover || !trigger || isOpen) return;
+		isOpen = true;
+		wrap.setAttribute("data-open", "true");
+		trigger.setAttribute("aria-expanded", "true");
+		popover.removeAttribute("hidden");
+		renderList();
+		const SN = window.SpatialNavigation;
+		if (SN && !sectionRegistered) {
+			try {
+				SN.add({
+					id: SECTION_ID,
+					selector: "#ps-popover button, #ps-popover a",
+					restrict: "self-only",
+					enterTo: "default-element",
+					defaultElement:
+						"#ps-popover button[data-id], #ps-popover a",
+				});
+				sectionRegistered = true;
+			} catch {}
+		}
+		requestAnimationFrame(() => {
+			SN?.makeFocusable?.();
+			const first = /** @type {HTMLElement|null} */ (
+				popover.querySelector("button[data-id], a, button")
+			);
+			first?.focus?.();
+		});
+	}
+
+	function closePopover() {
+		if (!wrap || !popover || !trigger || !isOpen) return;
+		isOpen = false;
+		wrap.setAttribute("data-open", "false");
+		trigger.setAttribute("aria-expanded", "false");
+		popover.setAttribute("hidden", "");
+		const SN = window.SpatialNavigation;
+		if (SN && sectionRegistered) {
+			try {
+				SN.remove(SECTION_ID);
+			} catch {}
+			sectionRegistered = false;
+		}
+		trigger.focus?.();
+	}
+
+	function togglePopover() {
+		if (isOpen) closePopover();
+		else openPopover();
+	}
+
+	trigger?.addEventListener("click", (ev) => {
+		ev.stopPropagation();
+		togglePopover();
+	});
+
+	document.addEventListener("click", (ev) => {
+		if (!isOpen) return;
+		const target = /** @type {Node} */ (ev.target);
+		if (wrap && !wrap.contains(target)) closePopover();
+	});
+
+	document.addEventListener("keydown", (ev) => {
+		if (ev.key === "Escape" && isOpen) {
+			ev.stopPropagation();
+			closePopover();
+		}
+	});
 
 	refreshBtn?.addEventListener("click", async () => {
 		await refreshActive();
@@ -137,8 +220,9 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 			titleEl.textContent = "No playlist";
 			titleEl.classList.add("text-fg-3");
 			titleEl.classList.remove("text-fg");
-			badgeEl.classList.add("hidden");
-			badgeEl.classList.remove("inline-flex");
+			badgeEl.textContent = "—";
+			badgeEl.classList.remove("hidden");
+			badgeEl.classList.add("inline-flex");
 			refreshBtn?.classList.add("hidden");
 			refreshBtn?.classList.remove("flex");
 			return;
@@ -257,80 +341,6 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 			})[c]
 		);
 	}
-
-	function positionPopover() {
-		if (!trigger || !popover) return;
-		const rect = trigger.getBoundingClientRect();
-		const gap = 8;
-		const margin = 8;
-		const vw = window.innerWidth;
-		const vh = window.innerHeight;
-		const popW = popover.offsetWidth;
-		const popH = popover.offsetHeight;
-
-		let top = rect.bottom + gap;
-		if (top + popH + margin > vh) {
-			top = Math.max(margin, rect.top - gap - popH);
-		}
-
-		let left = rect.right - popW;
-		if (left < margin) left = margin;
-		if (left + popW > vw - margin) left = vw - margin - popW;
-
-		popover.style.top = `${top}px`;
-		popover.style.left = `${left}px`;
-		popover.style.right = "auto";
-		popover.style.bottom = "auto";
-	}
-
-	const SECTION_ID = "ps-popover-section";
-	let sectionRegistered = false;
-
-	popover?.addEventListener("toggle", (ev) => {
-		const e = /** @type {ToggleEvent} */ (ev);
-		if (e.newState === "open") {
-			renderList();
-			const SN = window.SpatialNavigation;
-			if (SN && !sectionRegistered) {
-				try {
-					SN.add({
-						id: SECTION_ID,
-						selector: "#ps-popover button, #ps-popover a",
-						restrict: "self-only",
-						enterTo: "default-element",
-						defaultElement:
-							"#ps-popover button[data-id], #ps-popover a",
-					});
-					sectionRegistered = true;
-				} catch {}
-			}
-			requestAnimationFrame(() => {
-				positionPopover();
-				SN?.makeFocusable?.();
-				const first = /** @type {HTMLElement|null} */ (
-					popover?.querySelector(
-						"button[data-id], a, button"
-					)
-				);
-				first?.focus?.();
-			});
-			trigger?.setAttribute("aria-expanded", "true");
-		} else {
-			const SN = window.SpatialNavigation;
-			if (SN && sectionRegistered) {
-				try {
-					SN.remove(SECTION_ID);
-				} catch {}
-				sectionRegistered = false;
-			}
-			trigger?.setAttribute("aria-expanded", "false");
-			trigger?.focus?.();
-		}
-	});
-
-	window.addEventListener("resize", () => {
-		if (popover?.matches?.(":popover-open")) positionPopover();
-	});
 
 	document.addEventListener("xt:active-changed", () => {
 		renderHeader();

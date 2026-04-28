@@ -598,9 +598,7 @@ function paintChannels(data, fromCache, age) {
     `${all.length.toLocaleString()} channels` +
     (fromCache ? ` · cached, ${fmtAge(age)}` : "")
   renderCategoryPicker(all)
-  mountVirtualList(all)
-  // Deep-link from /epg: ?channel=<id> auto-plays. Done after channels are
-  // mounted so we have the full list to pull the name from.
+  applyFilter()
   maybeAutoplayFromUrl()
 }
 
@@ -660,8 +658,6 @@ async function loadChannels() {
 
   try {
     if (isLikelyM3USource(creds.host, creds.user, creds.pass)) {
-      // M3U: cache the *parsed* array so we skip both the network and the
-      // 5,000-line regex-heavy parse on subsequent loads.
       const { data, fromCache, age } = await cachedFetch(
         active._id,
         "m3u",
@@ -679,10 +675,6 @@ async function loadChannels() {
       )
       indexDirectUrls(data)
       categoryMap = null
-      // Persist any `x-tvg-url` discovered during the M3U parse so /epg can
-      // fetch XMLTV without re-downloading the (potentially 50MB+) playlist.
-      // m3uEpgUrl is set by parseM3U on cache miss; on cache hit it stays
-      // empty and we leave the previously-persisted value alone.
       if (m3uEpgUrl) {
         try {
           localStorage.setItem(`xt_m3u_epg:${active._id}`, m3uEpgUrl)
@@ -692,7 +684,6 @@ async function loadChannels() {
       return
     }
 
-    // Xtream: cache the final shaped channel array (categories are merged in).
     const { data, fromCache, age } = await cachedFetch(
       active._id,
       "live",
