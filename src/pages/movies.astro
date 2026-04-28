@@ -1,7 +1,7 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import SearchInput from "@/components/SearchInput.astro";
-import { IconChevronDown, IconPlayerPlay, IconX } from "@tabler/icons-svelte";
+import { IconChevronDown, IconPlayerPlay, IconX, IconDownload } from "@tabler/icons-svelte";
 ---
 
 <Layout pageTitle="Movies">
@@ -47,7 +47,7 @@ import { IconChevronDown, IconPlayerPlay, IconX } from "@tabler/icons-svelte";
 		</div>
 
 		<!-- Poster grid. p-2 reserves room for the focus/hover ring (2px) and
-		     the translateY(-2px) lift on edge cards — overflow-auto would
+		     the translateY(-2px) lift on edge cards - overflow-auto would
 		     otherwise clip both. -->
 		<section
 			id="movie-grid"
@@ -75,7 +75,7 @@ import { IconChevronDown, IconPlayerPlay, IconX } from "@tabler/icons-svelte";
 					<h2
 						id="movie-detail-title"
 						class="text-base sm:text-lg font-semibold truncate min-w-0">
-						—
+						-
 					</h2>
 					<button
 						id="movie-detail-close"
@@ -133,6 +133,16 @@ import { IconChevronDown, IconPlayerPlay, IconX } from "@tabler/icons-svelte";
 								class="rounded-xl border border-line px-6 py-3 text-base min-w-44
 									hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent">
 								Add to favorites
+							</button>
+							<button
+								id="movie-detail-download"
+								type="button"
+								hidden
+								class="flex items-center justify-center gap-2 rounded-xl border border-line px-6 py-3 text-base min-w-44 text-fg-2
+									hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent
+									transition-colors">
+								<IconDownload aria-hidden="true" stroke={2} class="size-5" />
+								<span id="movie-detail-download-label">Download</span>
 							</button>
 						</div>
 

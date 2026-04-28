@@ -18,7 +18,8 @@
 import { Store } from "@tauri-apps/plugin-store"
 
 const isTauri =
-  typeof window !== "undefined" && !!window.__TAURI__
+  typeof window !== "undefined" &&
+  (!!window.__TAURI_INTERNALS__ || !!window.__TAURI__)
 
 const STORAGE_KEY = "xt_prefs"
 const RECENT_CAP = 30
@@ -57,7 +58,7 @@ const setCookie = (name, value, days = 365) => {
 }
 
 // ---------------------------------------------------------------------------
-// Raw read / write — mirrors creds.js
+// Raw read / write - mirrors creds.js
 // ---------------------------------------------------------------------------
 async function readRaw() {
   try {
@@ -202,7 +203,7 @@ function recKey(kind) {
 
 /**
  * Synchronous read from the in-memory cache. Caller is responsible for
- * `await ensureLoaded()` before relying on results — but if loading hasn't
+ * `await ensureLoaded()` before relying on results - but if loading hasn't
  * happened yet, this returns an empty Set rather than throwing, which is
  * correct for "show no stars yet" behaviour during the initial render.
  *
@@ -254,7 +255,7 @@ export function getRecents(playlistId, kind) {
 
 /**
  * Push an entry to recents. Dedupes (same id moves to top), capped at
- * RECENT_CAP. Safe to call on every play() — internal short-circuit keeps it
+ * RECENT_CAP. Safe to call on every play() - internal short-circuit keeps it
  * cheap when the same channel is replayed. We store name + logo alongside the
  * id so the recent rail can render *before* the channel list has loaded
  * (matches iptvnator's pattern: recents survive a stale-cache cold start).

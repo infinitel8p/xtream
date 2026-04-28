@@ -15,6 +15,7 @@ import {
   pushRecent,
   getRecents,
 } from "@/scripts/lib/preferences.js"
+import { providerFetch } from "@/scripts/lib/provider-fetch.js"
 
 const SERIES_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -113,7 +114,7 @@ document.addEventListener("xt:recents-changed", (e) => {
 // ----------------------------
 async function ensureSeriesCategoryMap() {
   if (categoryMap) return categoryMap
-  const r = await fetch(buildApiUrl(creds, "get_series_categories"))
+  const r = await providerFetch(buildApiUrl(creds, "get_series_categories"))
   const data = await r.json().catch(() => [])
   const arr = Array.isArray(data)
     ? data
@@ -591,7 +592,7 @@ async function loadSeries() {
       SERIES_TTL_MS,
       async () => {
         const catMap = await ensureSeriesCategoryMap()
-        const r = await fetch(buildApiUrl(creds, "get_series"))
+        const r = await providerFetch(buildApiUrl(creds, "get_series"))
         const body = await r.text()
         if (!r.ok) {
           console.error("Upstream error body:", body)
@@ -640,7 +641,7 @@ async function loadSeries() {
   } catch (e) {
     console.error(e)
     listStatus.textContent =
-      "Couldn't load series — check your login or try Refresh."
+      "Couldn't load series - check your login or try Refresh."
     filtered = []
     renderGrid()
   }
@@ -877,8 +878,8 @@ async function openDetail(series) {
   try {
     // Some Xtream backends want `series_id=`, others `series=`. api.md says
     // `series=`, but real-world providers commonly only accept `series_id=`.
-    // Send both — the server picks whichever it recognises.
-    const r = await fetch(
+    // Send both - the server picks whichever it recognises.
+    const r = await providerFetch(
       buildApiUrl(creds, "get_series_info", {
         series_id: String(series.id),
         series: String(series.id),
@@ -906,7 +907,7 @@ async function openDetail(series) {
     if (currentDetailSeries?.id !== series.id) return // user closed/swapped
 
     // If no episodes came back, log the raw response so it's diagnosable
-    // — this is how every "no episodes" issue gets unstuck (provider
+    // - this is how every "no episodes" issue gets unstuck (provider
     // returns a different shape, or returns empty when given `series=`).
     if (!Object.keys(episodesByKey).length) {
       console.warn(
@@ -959,7 +960,7 @@ async function playEpisode(episode) {
   if (!currentDetailSeries || !episode) return
   const src = buildEpisodeStreamUrl(episode)
 
-  // Recents at the SERIES level — what users want surfaced as a row, not
+  // Recents at the SERIES level - what users want surfaced as a row, not
   // a stream of "S2E5"-style episode-level entries that bury the show name.
   if (activePlaylistId) {
     pushRecent(

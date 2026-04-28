@@ -16,6 +16,14 @@ import {
   pushRecent,
   getRecents,
 } from "@/scripts/lib/preferences.js"
+import { providerFetch } from "@/scripts/lib/provider-fetch.js"
+import {
+  startDownload,
+  isDownloadable,
+  inferExt,
+  cancelDownload,
+  DOWNLOAD_PROGRESS_EVENT,
+} from "@/scripts/lib/downloads.js"
 
 const VOD_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -59,6 +67,8 @@ const detailPlay = document.getElementById("movie-detail-play")
 const detailFav = document.getElementById("movie-detail-fav")
 const detailClose = document.getElementById("movie-detail-close")
 const detailPlayerWrap = document.getElementById("movie-detail-player-wrap")
+const detailDownload = document.getElementById("movie-detail-download")
+const detailDownloadLabel = document.getElementById("movie-detail-download-label")
 
 // ----------------------------
 // State
@@ -114,7 +124,7 @@ document.addEventListener("xt:recents-changed", (e) => {
 // ----------------------------
 async function ensureVodCategoryMap() {
   if (categoryMap) return categoryMap
-  const r = await fetch(buildApiUrl(creds, "get_vod_categories"))
+  const r = await providerFetch(buildApiUrl(creds, "get_vod_categories"))
   const data = await r.json().catch(() => [])
   const arr = Array.isArray(data)
     ? data
@@ -607,7 +617,7 @@ async function loadMovies() {
       VOD_TTL_MS,
       async () => {
         const catMap = await ensureVodCategoryMap()
-        const r = await fetch(buildApiUrl(creds, "get_vod_streams"))
+        const r = await providerFetch(buildApiUrl(creds, "get_vod_streams"))
         const body = await r.text()
         if (!r.ok) {
           console.error("Upstream error body:", body)
@@ -657,7 +667,7 @@ async function loadMovies() {
   } catch (e) {
     console.error(e)
     listStatus.textContent =
-      "Couldn't load movies — check your login or try Refresh."
+      "Couldn't load movies - check your login or try Refresh."
     filtered = []
     renderGrid()
   }
@@ -727,7 +737,7 @@ function syncDetailFavButton() {
   if (!detailFav || !currentDetailMovie || !activePlaylistId) return
   const fav = isFavorite(activePlaylistId, "vod", currentDetailMovie.id)
   // Action-clear labels: tell the user what'll happen on click, not just
-  // describe state. "Remove from favorites" beats "★ In favorites" — the
+  // describe state. "Remove from favorites" beats "★ In favorites" - the
   // latter looks like a status, not a button.
   detailFav.textContent = fav ? "Remove from favorites" : "Add to favorites"
   detailFav.classList.toggle("text-accent", fav)
@@ -774,6 +784,15 @@ async function openDetail(movie) {
 
   syncDetailFavButton()
 
+  if (detailDownload) {
+    detailDownload.removeAttribute("hidden")
+    detailDownload.removeAttribute("disabled")
+    if (detailDownloadLabel) detailDownloadLabel.textContent = "Download"
+    detailDownload.title = isDownloadable()
+      ? "Download to your chosen folder"
+      : "Open the source URL in a new tab (desktop app saves to disk)"
+  }
+
   if (typeof detailDlg.showModal === "function") detailDlg.showModal()
   else detailDlg.setAttribute("open", "")
 
@@ -785,7 +804,7 @@ async function openDetail(movie) {
 
   // Fetch info in the background to fill plot/meta + prepare the stream URL.
   try {
-    const r = await fetch(
+    const r = await providerFetch(
       buildApiUrl(creds, "get_vod_info", { vod_id: String(movie.id) })
     )
     if (!r.ok) throw new Error(await r.text())
@@ -855,7 +874,7 @@ async function openDetail(movie) {
 async function startPlayback() {
   if (!currentDetailMovie) return
   if (!currentDetailSrc) {
-    // get_vod_info might still be in flight — retry briefly.
+    // get_vod_info might still be in flight - retry briefly.
     let waited = 0
     while (!currentDetailSrc && waited < 4000) {
       await new Promise((r) => setTimeout(r, 100))
@@ -896,6 +915,83 @@ detailFav?.addEventListener("click", () => {
   toggleFavorite(activePlaylistId, "vod", currentDetailMovie.id)
 })
 
+/** Tracks the download started from this modal so we can mirror its
+ *  progress onto the button label. Cleared on terminal status or dialog
+ *  close. */
+let activeDownloadId = null
+function detachDownloadProgress() {
+  document.removeEventListener(DOWNLOAD_PROGRESS_EVENT, onDownloadProgress)
+  activeDownloadId = null
+}
+function onDownloadProgress(e) {
+  const d = /** @type {CustomEvent} */ (e).detail
+  if (!d || d.id !== activeDownloadId) return
+  if (!detailDownload) return
+  if (d.status === "downloading") {
+    const pct =
+      d.bytesTotal > 0 ? Math.floor((d.bytesDone / d.bytesTotal) * 100) : null
+    if (detailDownloadLabel) {
+      detailDownloadLabel.textContent =
+        pct !== null ? `Downloading ${pct}%` : "Downloading…"
+    }
+  } else if (d.status === "done") {
+    if (detailDownloadLabel) detailDownloadLabel.textContent = "Saved"
+    detailDownload.removeAttribute("disabled")
+    detailDownload.title = d.path ? `Saved to ${d.path}` : "Saved"
+    detachDownloadProgress()
+  } else if (d.status === "error") {
+    if (detailDownloadLabel) detailDownloadLabel.textContent = "Failed"
+    detailDownload.removeAttribute("disabled")
+    detailDownload.title = d.error || "Download failed"
+    console.error("Download failed:", d.error)
+    detachDownloadProgress()
+  } else if (d.status === "cancelled") {
+    if (detailDownloadLabel) detailDownloadLabel.textContent = "Download"
+    detailDownload.removeAttribute("disabled")
+    detailDownload.title = isDownloadable()
+      ? "Download to your chosen folder"
+      : "Open the source URL in a new tab (desktop app saves to disk)"
+    detachDownloadProgress()
+  }
+}
+
+detailDownload?.addEventListener("click", async () => {
+  if (!currentDetailMovie) return
+  let waited = 0
+  while (!currentDetailSrc && waited < 4000) {
+    await new Promise((r) => setTimeout(r, 100))
+    waited += 100
+  }
+  if (!currentDetailSrc) {
+    if (detailDownloadLabel) detailDownloadLabel.textContent = "No URL"
+    return
+  }
+  if (!isDownloadable()) {
+    window.open(currentDetailSrc, "_blank", "noopener,noreferrer")
+    if (detailDownloadLabel) detailDownloadLabel.textContent = "Opened"
+    return
+  }
+  try {
+    if (detailDownloadLabel) detailDownloadLabel.textContent = "Starting…"
+    detailDownload.setAttribute("disabled", "")
+    detailDownload.title = ""
+    document.addEventListener(DOWNLOAD_PROGRESS_EVENT, onDownloadProgress)
+    activeDownloadId = await startDownload({
+      url: currentDetailSrc,
+      title: currentDetailMovie.name || `Movie ${currentDetailMovie.id}`,
+      ext: inferExt(currentDetailSrc, "mp4"),
+    })
+    if (detailDownloadLabel) detailDownloadLabel.textContent = "Downloading…"
+  } catch (e) {
+    detachDownloadProgress()
+    const msg = String(e?.message || e || "Failed")
+    console.error("Download failed:", e)
+    if (detailDownloadLabel) detailDownloadLabel.textContent = "Failed"
+    detailDownload.removeAttribute("disabled")
+    detailDownload.title = msg
+  }
+})
+
 detailClose?.addEventListener("click", () => detailDlg?.close?.())
 
 detailDlg?.addEventListener("click", (e) => {
@@ -903,8 +999,6 @@ detailDlg?.addEventListener("click", (e) => {
 })
 
 detailDlg?.addEventListener("close", () => {
-  // Stop playback when the user backs out of the modal and reset hero
-  // back to the poster-visible state for the next open.
   try {
     vjs?.pause?.()
     vjs?.reset?.()
@@ -913,6 +1007,7 @@ detailDlg?.addEventListener("close", () => {
   if (detailPoster) detailPoster.classList.remove("hidden")
   const videoEl = document.getElementById("movie-player")
   videoEl?.setAttribute("hidden", "")
+  detachDownloadProgress()
   currentDetailMovie = null
   currentDetailSrc = ""
 })

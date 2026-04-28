@@ -18,6 +18,7 @@ import {
   pushRecent,
   getRecents,
 } from "@/scripts/lib/preferences.js"
+import { providerFetch } from "@/scripts/lib/provider-fetch.js"
 
 // Channel lists rarely change within a session; refresh once a day or when
 // the user explicitly hits the refresh button (which calls invalidateEntry).
@@ -433,7 +434,7 @@ searchEl?.addEventListener("input", debounce(applyFilter, 160))
 
 async function ensureCategoryMap() {
   if (categoryMap) return categoryMap
-  const r = await fetch(buildApiUrl(creds, "get_live_categories"))
+  const r = await providerFetch(buildApiUrl(creds, "get_live_categories"))
   const data = await r.json().catch(() => [])
   const arr = Array.isArray(data)
     ? data
@@ -663,7 +664,7 @@ async function loadChannels() {
         "m3u",
         CHANNELS_TTL_MS,
         async () => {
-          const r = await fetch(creds.host)
+          const r = await providerFetch(creds.host)
           if (!r.ok) throw new Error(`M3U ${r.status}: ${await r.text()}`)
           const text = await r.text()
           return parseM3U(text)
@@ -690,7 +691,7 @@ async function loadChannels() {
       CHANNELS_TTL_MS,
       async () => {
         const catMap = await ensureCategoryMap()
-        const r = await fetch(buildApiUrl(creds, "get_live_streams"))
+        const r = await providerFetch(buildApiUrl(creds, "get_live_streams"))
         const body = await r.text()
         if (!r.ok) {
           console.error("Upstream error body:", body)
@@ -887,7 +888,7 @@ async function loadEPG(streamId) {
 
   epgList.innerHTML = `<div class="text-fg-3">Loading EPG…</div>`
   try {
-    const r = await fetch(url)
+    const r = await providerFetch(url)
     if (!r.ok) throw new Error(await r.text())
     const data = await r.json()
 

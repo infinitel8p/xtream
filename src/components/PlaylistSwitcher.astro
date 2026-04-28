@@ -97,28 +97,12 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 	import {
 		getEntries,
 		getActiveEntry,
-		selectEntry,
-		removeEntry,
 		refreshActive,
 	} from "@/scripts/lib/creds.js";
 	import {
-		ICON_TRASH,
-		ICON_PENCIL,
-		ICON_CHECK,
-	} from "@/scripts/lib/icons.js";
-	import { getNewestCacheTime } from "@/scripts/lib/cache.js";
-
-	function fmtAge(ts) {
-		if (!ts) return "";
-		const ms = Date.now() - ts;
-		if (ms < 60_000) return "just now";
-		const m = Math.floor(ms / 60_000);
-		if (m < 60) return `${m}m ago`;
-		const h = Math.floor(m / 60);
-		if (h < 24) return `${h}h ago`;
-		const d = Math.floor(h / 24);
-		return `${d}d ago`;
-	}
+		renderPlaylistRow,
+		PLAYLIST_LIST_EMPTY_COPY,
+	} from "@/scripts/lib/playlist-rows.js";
 
 	const wrap = /** @type {HTMLElement|null} */ (
 		document.querySelector("[data-ps-wrap]")
@@ -220,7 +204,7 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 			titleEl.textContent = "No playlist";
 			titleEl.classList.add("text-fg-3");
 			titleEl.classList.remove("text-fg");
-			badgeEl.textContent = "—";
+			badgeEl.textContent = "-";
 			badgeEl.classList.remove("hidden");
 			badgeEl.classList.add("inline-flex");
 			refreshBtn?.classList.add("hidden");
@@ -241,105 +225,30 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 		if (!listEl) return;
 		const entries = await getEntries();
 		if (!entries.length) {
-			listEl.innerHTML =
-				'<div class="px-3.5 py-4 text-fg-3 text-xs">No playlists yet.</div>';
+			listEl.innerHTML = `<div class="px-3.5 py-4 text-fg-3 text-xs">${PLAYLIST_LIST_EMPTY_COPY}</div>`;
 			return;
 		}
 		const active = await getActiveEntry();
 		const frag = document.createDocumentFragment();
-
 		for (const e of entries) {
-			const isActive = active?._id === e._id;
-			const row = document.createElement("div");
-			row.className =
-				"relative flex items-stretch gap-0.5 pl-3 pr-1 transition-colors hover:bg-surface-2 focus-within:bg-surface-2";
-
-			if (isActive) {
-				const rule = document.createElement("span");
-				rule.className =
-					"absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-accent";
-				rule.setAttribute("aria-hidden", "true");
-				row.appendChild(rule);
-			}
-
-			const cacheTs = getNewestCacheTime(e._id);
-			const ageLabel = fmtAge(cacheTs);
-
-			const pick = document.createElement("button");
-			pick.type = "button";
-			pick.className =
-				"flex flex-1 items-center gap-2.5 py-2.5 text-left min-w-0 min-h-11 outline-none";
-			pick.dataset.id = e._id;
-			pick.innerHTML = `
-				<span class="inline-flex h-5 px-1.5 items-center justify-center rounded-md text-label font-semibold uppercase ring-1 shrink-0 ${
-					e.type === "xtream"
-						? "ring-accent/40 text-accent bg-accent-soft"
-						: "ring-line text-fg-2 bg-surface-2"
-				}">${e.type === "xtream" ? "XT" : "M3U"}</span>
-				<span class="flex flex-col min-w-0 flex-1">
-					<span class="truncate text-sm ${
-						isActive ? "text-fg font-medium" : "text-fg-2"
-					}">${escapeHtml(e.title)}</span>
-					${
-						ageLabel
-							? `<span class="truncate text-2xs text-fg-3 tabular-nums">Updated ${ageLabel}</span>`
-							: `<span class="truncate text-2xs text-fg-3 italic">Not loaded yet</span>`
-					}
-				</span>
-				${
-					isActive
-						? `<span class="check-draw text-accent shrink-0 inline-flex text-sm">${ICON_CHECK}</span>`
-						: ""
-				}
-			`;
-			pick.addEventListener("click", async () => {
-				await selectEntry(e._id);
-				await renderHeader();
-				await renderList();
-				closePopover();
-			});
-
-			const edit = document.createElement("a");
-			edit.href = `/login?edit=${encodeURIComponent(e._id)}`;
-			edit.title = "Edit";
-			edit.setAttribute("aria-label", `Edit ${e.title}`);
-			edit.className =
-				"shrink-0 rounded-md px-1.5 py-2 text-fg-3 hover:text-fg hover:bg-surface focus:text-fg focus:bg-surface min-h-10 inline-flex items-center justify-center transition-colors outline-none";
-			edit.innerHTML = `<span class="inline-flex text-base">${ICON_PENCIL}</span>`;
-
-			const del = document.createElement("button");
-			del.type = "button";
-			del.title = "Remove";
-			del.setAttribute("aria-label", `Remove ${e.title}`);
-			del.className =
-				"shrink-0 rounded-md px-1.5 py-2 text-fg-3 hover:text-bad hover:bg-bad/10 focus:text-bad focus:bg-bad/10 min-h-10 inline-flex items-center justify-center transition-colors outline-none";
-			del.innerHTML = `<span class="inline-flex text-base">${ICON_TRASH}</span>`;
-			del.addEventListener("click", async (ev) => {
-				ev.stopPropagation();
-				if (!confirm(`Remove "${e.title}"?`)) return;
-				await removeEntry(e._id);
-				await renderHeader();
-				await renderList();
-			});
-
-			row.append(pick, edit, del);
-			frag.appendChild(row);
+			frag.appendChild(
+				renderPlaylistRow({
+					entry: e,
+					isActive: active?._id === e._id,
+					density: "compact",
+					onAfterSelect: async () => {
+						await renderHeader();
+						await renderList();
+						closePopover();
+					},
+					onAfterRemove: async () => {
+						await renderHeader();
+						await renderList();
+					},
+				})
+			);
 		}
-
 		listEl.replaceChildren(frag);
-	}
-
-	function escapeHtml(s) {
-		return String(s).replace(
-			/[&<>"']/g,
-			(c) => ({
-				"&": "&amp;",
-				"<": "&lt;",
-				">": "&gt;",
-				'"': "&quot;",
-				"'": "&#39;",
-			})[c]
-		);
 	}
 
 	document.addEventListener("xt:active-changed", () => {

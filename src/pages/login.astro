@@ -174,6 +174,8 @@ import { IconArrowLeft } from "@tabler/icons-svelte";
 		getEntries,
 		parseXtreamUrl,
 		testXtreamConnection,
+		testM3UUrl,
+		isTauri,
 	} from "@/scripts/lib/creds.js";
 
 	const $ = (id) => /** @type {any} */ (document.getElementById(id));
@@ -212,7 +214,7 @@ import { IconArrowLeft } from "@tabler/icons-svelte";
 		applyTabStyles(tabXtream, isX);
 		applyTabStyles(tabM3u, !isX);
 
-		testBtn.classList.toggle("hidden", !isX);
+		testBtn.classList.remove("hidden");
 		clearStatus();
 	}
 
@@ -273,44 +275,88 @@ import { IconArrowLeft } from "@tabler/icons-svelte";
 		return d.innerHTML;
 	}
 
+	function isPrivateHost(host) {
+		return (
+			/^10\./.test(host) ||
+			/^192\.168\./.test(host) ||
+			/^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+			host === "localhost" ||
+			host.endsWith(".local")
+		);
+	}
+
+	function privateHostHint(rawUrl) {
+		try {
+			const u = new URL(rawUrl);
+			if (!isTauri && isPrivateHost(u.hostname)) {
+				return " The browser may block private-network requests - try the desktop app.";
+			}
+		} catch {}
+		return "";
+	}
+
 	testBtn.addEventListener("click", async () => {
-		if (mode !== "xtream") return;
-		const serverUrl = serverEl.value.trim();
-		const username = userEl.value.trim();
-		const password = passEl.value.trim();
-		if (!serverUrl || !username || !password) {
-			showStatus(
-				"unavailable",
-				"Please fill server URL, username and password."
-			);
-			return;
-		}
 		testBtn.disabled = true;
-		showStatus("busy", "Testing connection…");
-		const r = await testXtreamConnection({
-			serverUrl,
-			username,
-			password,
-		});
-		testBtn.disabled = false;
-		const exp = r.expDate
-			? ` Expires ${new Date(r.expDate).toLocaleDateString()}.`
-			: "";
-		switch (r.status) {
-			case "active":
-				showStatus("active", `Connected. Account is active.${exp}`);
-				break;
-			case "expired":
-				showStatus("expired", `Account expired.${exp}`);
-				break;
-			case "inactive":
-				showStatus("inactive", `Account is inactive.${exp}`);
-				break;
-			default:
-				showStatus(
-					"unavailable",
-					`Couldn't reach the server${r.message ? ` — ${r.message}` : "."}`
-				);
+		try {
+			if (mode === "xtream") {
+				const serverUrl = serverEl.value.trim();
+				const username = userEl.value.trim();
+				const password = passEl.value.trim();
+				if (!serverUrl || !username || !password) {
+					showStatus(
+						"unavailable",
+						"Please fill server URL, username and password."
+					);
+					return;
+				}
+				showStatus("busy", "Testing connection…");
+				const r = await testXtreamConnection({
+					serverUrl,
+					username,
+					password,
+				});
+				const exp = r.expDate
+					? ` Expires ${new Date(r.expDate).toLocaleDateString()}.`
+					: "";
+				switch (r.status) {
+					case "active":
+						showStatus("active", `Connected. Account is active.${exp}`);
+						break;
+					case "expired":
+						showStatus("expired", `Account expired.${exp}`);
+						break;
+					case "inactive":
+						showStatus("inactive", `Account is inactive.${exp}`);
+						break;
+					default:
+						showStatus(
+							"unavailable",
+							`Couldn't reach the server${r.message ? ` - ${r.message}` : "."}${privateHostHint(serverUrl)}`
+						);
+				}
+			} else {
+				const url = m3uEl.value.trim();
+				if (!url) {
+					showStatus("unavailable", "Please enter an M3U URL.");
+					return;
+				}
+				showStatus("busy", "Fetching playlist…");
+				const r = await testM3UUrl(url);
+				if (r.status === "active") {
+					const n = r.count || 0;
+					showStatus(
+						"active",
+						`Playlist looks good${n ? ` - ${n.toLocaleString()} entries.` : "."}`
+					);
+				} else {
+					showStatus(
+						"unavailable",
+						`Couldn't fetch the playlist${r.message ? ` - ${r.message}` : "."}${privateHostHint(url)}`
+					);
+				}
+			}
+		} finally {
+			testBtn.disabled = false;
 		}
 	});
 

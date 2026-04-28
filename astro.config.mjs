@@ -21,8 +21,24 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        external: ["@tauri-apps/plugin-process", "@tauri-apps/plugin-updater"],
+        external: [
+          "@tauri-apps/plugin-process",
+          "@tauri-apps/plugin-updater",
+          "@tauri-apps/plugin-http",
+          "@tauri-apps/plugin-fs",
+          "@tauri-apps/plugin-dialog",
+        ],
       },
+    },
+    optimizeDeps: {
+      include: [
+        "@tauri-apps/api/app",
+        "@tauri-apps/plugin-process",
+        "@tauri-apps/plugin-updater",
+        "@tauri-apps/plugin-http",
+        "@tauri-apps/plugin-fs",
+        "@tauri-apps/plugin-dialog",
+      ],
     },
   },
 

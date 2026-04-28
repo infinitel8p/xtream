@@ -1,16 +1,13 @@
+import { providerFetch } from "@/scripts/lib/provider-fetch.js"
+
 const GZIP_CT = /application\/(x-)?gzip|application\/x-gunzip/i
 
 /**
- * Fetch a URL and decompress its body if it looks like gzip. Returns the
- * raw text. Throws on HTTP errors. Falls back to plain text if the browser
- * lacks `DecompressionStream` (older WebViews) — providers that gzip aren't
- * usable on those WebViews, but we won't crash.
- *
  * @param {string} url
  * @param {RequestInit} [init]
  */
 export async function fetchAndMaybeGunzip(url, init) {
-  const r = await fetch(url, init)
+  const r = await providerFetch(url, init)
   if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`)
 
   const ct = r.headers.get("content-type") || ""

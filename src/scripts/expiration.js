@@ -5,6 +5,7 @@ import {
     safeHttpUrl,
 } from "./lib/creds.js"
 import { cachedFetch } from "./lib/cache.js"
+import { providerFetch } from "./lib/provider-fetch.js"
 
 const USER_INFO_TTL_MS = 60 * 60 * 1000 // 1 hour
 
@@ -31,7 +32,7 @@ export async function injectExpirationDate() {
             "user_info",
             USER_INFO_TTL_MS,
             async () => {
-                const response = await fetch(apiUrl)
+                const response = await providerFetch(apiUrl)
                 if (!response.ok) {
                     throw new Error(
                         `HTTP ${response.status} ${response.statusText}`

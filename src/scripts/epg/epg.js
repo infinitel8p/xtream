@@ -10,6 +10,7 @@ import {
 } from "@/scripts/lib/creds.js"
 import { getCached } from "@/scripts/lib/cache.js"
 import { fetchAndMaybeGunzip } from "@/scripts/lib/network.js"
+import { providerFetch } from "@/scripts/lib/provider-fetch.js"
 
 const PX_PER_HOUR = 200
 const HOURS_VISIBLE = 6
@@ -209,7 +210,7 @@ function renderChannelRow(channel, programmesForRow) {
 
   row.appendChild(info)
 
-  // Programme track — relative-positioned host for absolute cells.
+  // Programme track - relative-positioned host for absolute cells.
   const track = document.createElement("div")
   track.className = "epg-track relative shrink-0"
   track.style.width = `${HOURS_VISIBLE * PX_PER_HOUR}px`
@@ -318,14 +319,14 @@ function pickChannels(cachedChannels) {
   const filtered = activeCat
     ? cachedChannels.filter((c) => (c.category || "") === activeCat)
     : cachedChannels.slice()
-  // Drop channels with no tvg-id — they have no EPG match in XMLTV anyway.
+  // Drop channels with no tvg-id - they have no EPG match in XMLTV anyway.
   const withEpg = filtered.filter((c) => c.tvgId)
   return withEpg.slice(0, MAX_CHANNELS)
 }
 
 async function fetchXtreamChannels() {
   // Categories first so we can resolve `category_id → name` for streams.
-  const catRes = await fetch(buildApiUrl(creds, "get_live_categories"))
+  const catRes = await providerFetch(buildApiUrl(creds, "get_live_categories"))
   if (!catRes.ok) throw new Error(`HTTP ${catRes.status}`)
   const catData = await catRes.json().catch(() => [])
   const catArr = Array.isArray(catData)
@@ -342,7 +343,7 @@ async function fetchXtreamChannels() {
       ])
   )
 
-  const r = await fetch(buildApiUrl(creds, "get_live_streams"))
+  const r = await providerFetch(buildApiUrl(creds, "get_live_streams"))
   if (!r.ok) throw new Error(`HTTP ${r.status}`)
   const data = await r.json().catch(() => [])
   const arr = Array.isArray(data)
@@ -557,7 +558,7 @@ async function init() {
   if (!cached?.length) {
     if (isM3U) {
       showStatus(
-        "Open Live TV first so the M3U channel list is loaded — it's too big to refetch from this page."
+        "Open Live TV first so the M3U channel list is loaded - it's too big to refetch from this page."
       )
       return
     }

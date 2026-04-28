@@ -13,7 +13,8 @@
 import { Store } from "@tauri-apps/plugin-store"
 
 export const isTauri =
-  typeof window !== "undefined" && !!window.__TAURI__
+  typeof window !== "undefined" &&
+  (!!window.__TAURI_INTERNALS__ || !!window.__TAURI__)
 
 const STORAGE_KEY = "xt_playlists"
 const LEGACY_KEYS = ["host", "port", "user", "pass"]
@@ -386,7 +387,8 @@ export async function testXtreamConnection({ serverUrl, username, password }) {
       { host: serverUrl, port: "", user: username, pass: password },
       "get_account_info"
     )
-    const r = await fetch(url)
+    const { providerFetch } = await import("./provider-fetch.js")
+    const r = await providerFetch(url)
     if (!r.ok) {
       return {
         status: "unavailable",
@@ -405,6 +407,40 @@ export async function testXtreamConnection({ serverUrl, username, password }) {
     return { status: "active", expDate }
   } catch (e) {
     return { status: "unavailable", message: String(e) }
+  }
+}
+
+/**
+ * @returns {Promise<{ status: "active"|"unavailable", count?: number, message?: string }>}
+ */
+export async function testM3UUrl(url) {
+  if (!url) return { status: "unavailable", message: "Missing URL" }
+  if (!/^https?:\/\//i.test(url)) {
+    return { status: "unavailable", message: "URL must start with http(s)://" }
+  }
+  try {
+    const { providerFetch } = await import("./provider-fetch.js")
+    const r = await providerFetch(url)
+    if (!r.ok) {
+      return {
+        status: "unavailable",
+        message: `HTTP ${r.status} ${r.statusText}`,
+      }
+    }
+    const text = await r.text()
+    const head = text.slice(0, 4096)
+    const looksLikeM3U =
+      head.includes("#EXTM3U") || /#EXTINF\s*:/i.test(head)
+    if (!looksLikeM3U) {
+      return {
+        status: "unavailable",
+        message: "Response doesn't look like an M3U playlist.",
+      }
+    }
+    const matches = text.match(/#EXTINF\s*:/gi)
+    return { status: "active", count: matches ? matches.length : 0 }
+  } catch (e) {
+    return { status: "unavailable", message: String(e?.message || e) }
   }
 }
 

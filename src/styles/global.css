@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Theme tokens — slate foundation + soft fuchsia accent.*/
+/* Theme tokens - slate foundation + soft fuchsia accent.*/
 :root {
     color-scheme: light dark;
 }
@@ -12,7 +12,7 @@
     --breakpoint-xl: 80em;      /* 1280px */
     --breakpoint-2xl: 96em;     /* 1536px */
 
-    /* — surfaces — */
+    /* - surfaces - */
     --color-bg:        light-dark(oklch(0.985 0.004 250), oklch(0.165 0.013 255));
     --color-surface:   light-dark(oklch(1     0     0  ), oklch(0.215 0.013 255));
     --color-surface-2: light-dark(oklch(0.965 0.005 250), oklch(0.265 0.013 255));
@@ -20,28 +20,28 @@
     --color-line:      light-dark(oklch(0.9   0.008 250), oklch(0.34  0.013 255));
     --color-line-soft: light-dark(oklch(0.94  0.005 250), oklch(0.27  0.013 255));
 
-    /* — foreground — */
+    /* - foreground - */
     --color-fg:   light-dark(oklch(0.21  0.014 255), oklch(0.97  0.005 250));
     --color-fg-2: light-dark(oklch(0.4   0.013 255), oklch(0.78  0.011 250));
     --color-fg-3: light-dark(oklch(0.58  0.012 255), oklch(0.6   0.011 250));
 
-    /* — accent: a single soft fuchsia — */
+    /* - accent: a single soft fuchsia - */
     --color-accent:      light-dark(oklch(0.58 0.22 330), oklch(0.78 0.15 330));
     --color-accent-soft: light-dark(oklch(0.58 0.22 330 / 0.10), oklch(0.78 0.15 330 / 0.18));
 
-    /* — semantic states — */
+    /* - semantic states - */
     --color-ok:   light-dark(oklch(0.5  0.12 160), oklch(0.79 0.13 160));
     --color-warn: light-dark(oklch(0.6  0.14 75 ), oklch(0.84 0.13 80 ));
     --color-bad:  light-dark(oklch(0.55 0.18 25 ), oklch(0.74 0.18 25 ));
 
-    /* — fonts —
+    /* - fonts -
      * Geist for the UI (refined grotesk, calmer than Inter).
-     * Instrument Serif reserved for editorial moments — used sparingly
+     * Instrument Serif reserved for editorial moments - used sparingly
      * on hero headings to break the all-sans monotony. */
     --font-sans:  "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
     --font-serif: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
 
-    /* — type scale — */
+    /* - type scale - */
     --text-2xs:                       0.6875rem;
     --text-2xs--line-height:          1.3;
 
@@ -193,6 +193,83 @@ dialog[open]::backdrop {
             opacity: 0;
             transform: scale(1.6);
         }
+    }
+
+    .btn {
+        @apply inline-flex items-center justify-center gap-2 min-h-10 rounded-xl border border-line px-3 py-2 text-sm text-fg transition-colors;
+    }
+    .btn:not([disabled]):hover,
+    .btn:not([disabled]):focus-visible {
+        @apply bg-surface-2 border-accent;
+    }
+    .btn[aria-pressed="true"] {
+        @apply bg-surface-2 border-accent text-fg;
+    }
+    .btn[disabled],
+    .btn[data-loading="true"] {
+        @apply opacity-60 cursor-not-allowed;
+    }
+
+    .btn-danger {
+        @apply inline-flex items-center justify-center gap-2 min-h-10 rounded-xl px-3 py-2 text-sm text-bad transition-colors;
+        border: 1px solid color-mix(in oklch, var(--color-bad) 50%, transparent);
+    }
+    .btn-danger:not([disabled]):hover,
+    .btn-danger:not([disabled]):focus-visible {
+        @apply border-bad;
+        background: color-mix(in oklch, var(--color-bad) 12%, transparent);
+    }
+    .btn-danger[disabled],
+    .btn-danger[data-loading="true"] {
+        @apply opacity-60 cursor-not-allowed;
+    }
+
+    .btn-icon {
+        @apply size-4 shrink-0;
+    }
+    [data-loading="true"] .btn-icon {
+        animation: btn-spin 0.8s linear infinite;
+    }
+    @keyframes btn-spin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        [data-loading="true"] .btn-icon {
+            animation: none;
+        }
+    }
+
+    .pulse-ring {
+        position: relative;
+    }
+    .pulse-ring::after {
+        content: "";
+        position: absolute;
+        inset: -2px;
+        border-radius: inherit;
+        border: 2px solid var(--color-accent);
+        animation: live-pulse 2.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+        pointer-events: none;
+    }
+
+    .flash-ok {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        color: var(--color-ok);
+        animation: flash-ok 1.6s ease-out forwards;
+    }
+    @keyframes flash-ok {
+        0% { opacity: 0; transform: translateY(2px); }
+        15% { opacity: 1; transform: translateY(0); }
+        70% { opacity: 1; }
+        100% { opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .pulse-ring::after { animation: none; }
+        .flash-ok { animation: none; opacity: 1; }
     }
 }
 

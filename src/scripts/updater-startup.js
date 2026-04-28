@@ -3,7 +3,7 @@ const SESSION_FLAG = "xt_updater_checked"
 
 let isTauri = false
 try {
-    isTauri = !!window.__TAURI__
+    isTauri = !!window.__TAURI_INTERNALS__ || !!window.__TAURI__
 } catch {}
 
 async function maybeRunWindowsAutoUpdate() {
