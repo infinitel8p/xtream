@@ -37,12 +37,22 @@
 | Platform | How | Updates |
 | --- | --- | --- |
 | Windows (Microsoft Store) | [apps.microsoft.com](https://apps.microsoft.com/detail/9NN162Z0WXSR) | Microsoft Store |
-| Windows (sideload) | NSIS `.exe` from [Releases](https://github.com/infinitel8p/xtream/releases/latest) | In-app auto-updater |
+| Windows (sideload) | NSIS `.exe` (or `.msi`) from [Releases](https://github.com/infinitel8p/xtream/releases/latest) | In-app auto-updater |
+| macOS (Apple Silicon + Intel) | Universal `.dmg` from [Releases](https://github.com/infinitel8p/xtream/releases/latest) | In-app auto-updater |
+| Linux (Debian / Ubuntu / Mint) | `.deb` from [Releases](https://github.com/infinitel8p/xtream/releases/latest) | Manual |
+| Linux (Fedora / openSUSE / RHEL) | `.rpm` from [Releases](https://github.com/infinitel8p/xtream/releases/latest) | Manual |
+| Linux (any distro, portable) | `.AppImage` from [Releases](https://github.com/infinitel8p/xtream/releases/latest) | In-app auto-updater |
 | Android phone / tablet | [Google Play](https://play.google.com/store/apps/details?id=com.infinitel8p.xtream) | Play Store |
 | Android TV | Same APK, sideload via ADB or use Play Store on supported devices | Play Store |
 | Web preview | Build with `pnpm build` and serve `dist/` (no auto-update, no native features) | Manual |
 
-macOS, Linux, and iOS aren't currently distributed.
+### via winget
+
+The Microsoft Store listing is federated through `winget`, so you can install without opening the Store:
+
+```powershell
+winget install --id 9NN162Z0WXSR --source msstore
+```
 
 ## Develop
 
