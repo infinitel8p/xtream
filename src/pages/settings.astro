@@ -98,22 +98,22 @@ import {
           </div>
           <script is:inline>
             try {
-              var s = parseFloat(localStorage.getItem("xt_font_scale") || "1");
-              if (!isFinite(s) || s < 0.75 || s > 2) s = 1;
-              var group = document.getElementById("settings-font-scale");
-              if (group) {
-                var btns = group.querySelectorAll(".font-scale-btn");
-                for (var i = 0; i < btns.length; i++) {
-                  var v = parseFloat(btns[i].getAttribute("data-scale") || "1");
-                  btns[i].setAttribute("aria-pressed", Math.abs(v - s) < 0.001 ? "true" : "false");
+              var savedFontScale = parseFloat(localStorage.getItem("xt_font_scale") || "1");
+              if (!isFinite(savedFontScale) || savedFontScale < 0.75 || savedFontScale > 2) savedFontScale = 1;
+              var fontScaleGroup = document.getElementById("settings-font-scale");
+              if (fontScaleGroup) {
+                var fontScaleBtns = fontScaleGroup.querySelectorAll(".font-scale-btn");
+                for (var i = 0; i < fontScaleBtns.length; i++) {
+                  var btnScale = parseFloat(fontScaleBtns[i].getAttribute("data-scale") || "1");
+                  fontScaleBtns[i].setAttribute("aria-pressed", Math.abs(btnScale - savedFontScale) < 0.001 ? "true" : "false");
                 }
               }
-              var t = localStorage.getItem("xt_theme") || "system";
-              var tGroup = document.getElementById("settings-theme");
-              if (tGroup) {
-                var tBtns = tGroup.querySelectorAll(".theme-btn");
-                for (var j = 0; j < tBtns.length; j++) {
-                  tBtns[j].setAttribute("aria-pressed", tBtns[j].getAttribute("data-theme") === t ? "true" : "false");
+              var currentTheme = localStorage.getItem("xt_theme") || "system";
+              var themeGroup = document.getElementById("settings-theme");
+              if (themeGroup) {
+                var themeBtns = themeGroup.querySelectorAll(".theme-btn");
+                for (var j = 0; j < themeBtns.length; j++) {
+                  themeBtns[j].setAttribute("aria-pressed", themeBtns[j].getAttribute("data-theme") === currentTheme ? "true" : "false");
                 }
               }
             } catch (e) {}

@@ -24,17 +24,17 @@ const documentTitle = pageTitle
     <meta name="theme-color" content="#0e1628" media="(prefers-color-scheme: dark)" />
     <script is:inline>
       try {
-        var s = parseFloat(localStorage.getItem("xt_font_scale") || "1");
-        if (!isFinite(s) || s < 0.75 || s > 2) s = 1;
-        document.documentElement.style.setProperty("--xt-font-scale", String(s));
+        var fontScale = parseFloat(localStorage.getItem("xt_font_scale") || "1");
+        if (!isFinite(fontScale) || fontScale < 0.75 || fontScale > 2) fontScale = 1;
+        document.documentElement.style.setProperty("--xt-font-scale", String(fontScale));
         var cw = parseFloat(localStorage.getItem("xt_channels_w") || "");
         if (isFinite(cw) && cw >= 18 && cw <= 60) {
           document.documentElement.style.setProperty("--xt-channels-w", cw + "rem");
         }
 
-        var t = localStorage.getItem("xt_theme") || "system";
-        if (t === "light") document.documentElement.style.colorScheme = "light";
-        else if (t === "dark") document.documentElement.style.colorScheme = "dark";
+        var currentTheme = localStorage.getItem("xt_theme") || "system";
+        if (currentTheme === "light") document.documentElement.style.colorScheme = "light";
+        else if (currentTheme === "dark") document.documentElement.style.colorScheme = "dark";
       } catch (e) {}
     </script>
   </head>
