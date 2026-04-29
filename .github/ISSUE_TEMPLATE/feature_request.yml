@@ -1,0 +1,52 @@
+name: Feature request
+description: Suggest a new feature, enhancement, or change in behaviour.
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea? Great. Please describe the *use case* first - what you're trying to do and why - then a proposed solution if you have one. Use cases age better than specific UI proposals.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: The user-facing situation. "I want to be able to ..." or "Currently, when I ... I have to ...".
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How you'd like it to work. UI sketches / mockups / links to similar implementations welcome.
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other ways you could see this working, or workarounds you've tried.
+    validations:
+      required: false
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Which platforms would benefit?
+      multiple: true
+      options:
+        - Windows desktop
+        - Android phone / tablet
+        - Android TV
+        - Linux desktop
+        - macOS desktop
+        - Web build
+        - All
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched [existing issues and discussions](https://github.com/infinitel8p/xtream/issues?q=) and didn't find a duplicate.
+          required: true

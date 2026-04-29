@@ -1,0 +1,108 @@
+name: Bug report
+description: Something is broken or behaving unexpectedly in the app itself.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much as you can - the more specific the steps and environment, the faster this gets fixed.
+
+        **Not a bug in the app?**
+        - Stream won't play, EPG missing, channels missing -> use the **Playback / provider issue** template instead.
+        - Question about how to use the app -> open a [Discussion](https://github.com/infinitel8p/xtream/discussions).
+        - Found a security vulnerability -> please report it privately via [Security Advisories](https://github.com/infinitel8p/xtream/security/advisories/new), not here.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What's broken?
+      description: A clear, concise description of the bug.
+      placeholder: When I do X, the app does Y instead of Z.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that lead to the bug. The shorter and more specific the better.
+      placeholder: |
+        1. Open the app
+        2. Click ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+      placeholder: I expected ...
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include any error message text, screenshots, or short clips if helpful.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Windows desktop (NSIS installer)
+        - Windows desktop (Microsoft Store)
+        - Android phone / tablet
+        - Android TV
+        - Linux desktop
+        - macOS desktop
+        - Web build (browser)
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Visible in Settings -> About, or in the corner of any page.
+      placeholder: e.g. 1.1.0
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: e.g. Windows 11 23H2, Android 14, Ubuntu 24.04
+    validations:
+      required: true
+  - type: dropdown
+    id: playlist-type
+    attributes:
+      label: Playlist type
+      description: Which backend you have configured. Helpful even when the bug doesn't seem playback-related.
+      options:
+        - Xtream Codes
+        - Plain M3U / M3U8 URL
+        - Both
+        - No playlist configured
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / console output
+      description: |
+        Optional but very helpful. On the desktop build, open DevTools (Ctrl+Shift+I) and copy any errors from the Console tab. Redact anything that looks like a credential or a stream URL before pasting.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched [existing issues](https://github.com/infinitel8p/xtream/issues?q=is%3Aissue) and didn't find a duplicate.
+          required: true
+        - label: I'm running the latest version, or I've explained why I can't be.
+          required: true
+        - label: I've redacted any credentials, full stream URLs, or other sensitive info from the report.
+          required: true

@@ -1,0 +1,102 @@
+name: Playback / provider issue
+description: A specific stream, channel, EPG entry, or VOD title isn't working.
+title: "[Playback] "
+labels: ["playback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this when something inside your playlist isn't working: a channel won't play, EPG is missing, VOD info is wrong, etc.
+
+        **Important:** the app is just a player. It can't fix problems on the provider's side. Many "doesn't work" reports turn out to be provider-side issues. Please check whether the same stream works in VLC or another player before filing - and include that result below.
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where does it fail?
+      options:
+        - Live TV (channel won't play)
+        - Live TV (EPG empty / wrong / mistimed)
+        - Movies / VOD (won't play)
+        - Movies / VOD (metadata wrong)
+        - Series (seasons / episodes wrong)
+        - Series (episode won't play)
+        - Full EPG schedule grid
+        - Downloads
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: what-happens
+    attributes:
+      label: What happens?
+      description: Describe what you see. Include any on-screen error message verbatim.
+      placeholder: |
+        I click channel "BBC One" and the player shows "Loading..." for ~10 seconds, then the empty state returns.
+    validations:
+      required: true
+  - type: dropdown
+    id: playlist-type
+    attributes:
+      label: Playlist type
+      options:
+        - Xtream Codes
+        - Plain M3U / M3U8 URL
+    validations:
+      required: true
+  - type: dropdown
+    id: vlc-test
+    attributes:
+      label: Does the same stream work in VLC (or another player)?
+      description: |
+        For Xtream channels: try `http(s)://<host>:<port>/live/<user>/<pass>/<stream_id>.m3u8` directly in VLC.
+        For M3U entries: copy the channel's URL from your playlist into VLC.
+        This single check eliminates ~half of "won't play" reports as upstream issues.
+      options:
+        - "Yes, it works in VLC"
+        - "No, it also fails in VLC"
+        - "I haven't tested"
+    validations:
+      required: true
+  - type: input
+    id: stream-format
+    attributes:
+      label: Stream format (if known)
+      description: HLS (.m3u8), MPEG-TS, MP4, etc. Often visible in the Network tab of DevTools or in your provider's interface.
+      placeholder: e.g. HLS / .m3u8
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options:
+        - Windows desktop
+        - Android phone / tablet
+        - Android TV
+        - Linux desktop
+        - macOS desktop
+        - Web build
+    validations:
+      required: true
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      placeholder: e.g. 1.1.0
+    validations:
+      required: true
+  - type: textarea
+    id: console-errors
+    attributes:
+      label: Console / network errors
+      description: |
+        On the desktop build, open DevTools (Ctrl+Shift+I) and copy any errors from the Console tab. **Redact your credentials and the full stream URL** (the host:port and `/live/<user>/<pass>/...` part) - the error message itself is what we need.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmation
+      options:
+        - label: I redacted my credentials and full stream URL from any pasted output.
+          required: true
+        - label: I tried the same stream in VLC (or noted that I haven't).
+          required: true
