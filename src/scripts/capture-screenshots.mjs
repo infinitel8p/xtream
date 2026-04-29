@@ -32,9 +32,9 @@ const DEVICES = {
   "Desktop-1080p": { width: 1920, height: 1080, deviceScaleFactor: 1, isMobile: false, hasTouch: false },
   Chromebook: { width: 1366, height: 768, deviceScaleFactor: 1, isMobile: false, hasTouch: true },
   "Android-TV": { width: 1920, height: 1080, deviceScaleFactor: 1, isMobile: false, hasTouch: false },
-  "Android-XR": { width: 1032, height: 1104, deviceScaleFactor: 2, isMobile: false, hasTouch: false },
-  "iPad-Pro": { width: 1024, height: 1366, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
-  "iPad-Air": { width: 820, height: 1180, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
+  "Android-XR": { width: 1920, height: 1080, deviceScaleFactor: 2, isMobile: false, hasTouch: false },
+  "iPad-Pro": { width: 1366, height: 1024, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
+  "iPad-Air": { width: 1180, height: 820, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
   "Galaxy-S20-Ultra": { width: 412, height: 915, deviceScaleFactor: 3.5, isMobile: true, hasTouch: true },
 }
 
