@@ -19,10 +19,22 @@ import {
   getRecents,
 } from "@/scripts/lib/preferences.js"
 import { providerFetch } from "@/scripts/lib/provider-fetch.js"
+import { attachPlayerFocusKeeper } from "@/scripts/lib/player-focus-keeper.js"
 
-// Channel lists rarely change within a session; refresh once a day or when
-// the user explicitly hits the refresh button (which calls invalidateEntry).
 const CHANNELS_TTL_MS = 24 * 60 * 60 * 1000
+
+let currentlyPlayingId = null
+
+function setNowPlaying(id) {
+  currentlyPlayingId = id
+  if (!viewport) return
+  for (const row of viewport.querySelectorAll(".channel-row")) {
+    const idx = Number(row.dataset.idx)
+    const ch = filtered[idx]
+    if (ch && ch.id === id) row.dataset.nowPlaying = "true"
+    else delete row.dataset.nowPlaying
+  }
+}
 
 /** @type {{host:string,port:string,user:string,pass:string}} */
 let creds = { host: "", port: "", user: "", pass: "" }
@@ -47,24 +59,6 @@ function buildDirectM3U8(id) {
 let directUrlById = new Map()
 export let m3uEpgUrl = ""
 
-/**
- * Parse a (possibly very large) M3U/M3U8 playlist into our normalised
- * channel shape. Handles two real-world EXTINF variants:
- *
- *   #EXTINF:-1 tvg-id="x" tvg-logo="…" group-title="Sports",Channel Name
- *   #EXTINF:-1,Channel Name tvg-id="x" tvg-logo="…" group-title="…"
- *
- * Attributes are always read with a regex over the whole line, so they're
- * picked up regardless of which side of the comma they live on. The name
- * is the substring after the first comma with any `key="…"` attribute pairs
- * stripped out (so the alternate format doesn't bake attrs into the title).
- *
- * Also pulls `x-tvg-url` (or `tvg-url`) off the `#EXTM3U` header so the EPG
- * grid view has somewhere to fetch XMLTV from.
- *
- * Returns the channel array directly (callers cache that). The EPG URL is
- * exposed via the module-level `m3uEpgUrl` because it's tiny and per-load.
- */
 function parseM3U(text) {
   /** @type {Array<{ id:number, name:string, tvgId?:string, chno?:number, category?:string, logo?:string|null, url:string, norm:string }>} */
   const out = []
@@ -250,6 +244,7 @@ function renderVirtual() {
     row.dataset.idx = String(i)
     row.style.height = `${ROW_H}px`
     row.className = "channel-row flex w-full items-center gap-1"
+    if (ch.id === currentlyPlayingId) row.dataset.nowPlaying = "true"
 
     const playBtn = document.createElement("button")
     playBtn.type = "button"
@@ -312,6 +307,12 @@ function renderVirtual() {
       e.stopPropagation()
       if (!activePlaylistId) return
       toggleFavorite(activePlaylistId, "live", ch.id)
+      starBtn.classList.remove("star-pulse")
+      void starBtn.offsetWidth
+      starBtn.classList.add("star-pulse")
+    })
+    starBtn.addEventListener("animationend", () => {
+      starBtn.classList.remove("star-pulse")
     })
 
     row.append(playBtn, starBtn)
@@ -775,6 +776,8 @@ const ensurePlayer = async () => {
       },
     },
   })
+
+  attachPlayerFocusKeeper(vjs)
   return vjs
 }
 
@@ -783,6 +786,8 @@ async function play(streamId, name) {
   const src = hasDirectUrl(streamId)
     ? getDirectUrl(streamId)
     : buildDirectM3U8(streamId)
+
+  setNowPlaying(streamId)
 
   if (activePlaylistId) {
     const ch = all.find((c) => c.id === streamId)

@@ -124,11 +124,13 @@ import { IconRefresh, IconArrowLeft, IconChevronDown } from "@tabler/icons-svelt
 
 	<script>
 		import "../scripts/epg/epg.js";
+		import { attachDialogSpatialNav } from "../scripts/lib/dialog-spatial-nav.js";
 
 		const trigger = document.getElementById("epg-category-trigger");
 		const dlg = /** @type {HTMLDialogElement|null} */ (
 			document.getElementById("epg-category-dialog")
 		);
+		if (dlg) attachDialogSpatialNav(dlg, { defaultElement: "#epg-category-search" });
 		const closeBtn = document.getElementById("epg-category-close");
 		const list = document.getElementById("epg-category-list");
 		const search = /** @type {HTMLInputElement|null} */ (

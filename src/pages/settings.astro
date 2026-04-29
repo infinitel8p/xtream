@@ -17,9 +17,13 @@ import {
     class="w-full max-w-3xl mx-auto px-4 md:px-6 lg:px-8 pt-6 sm:pt-10 pb-12
            flex flex-col gap-8 sm:gap-10 flex-1 min-h-0 overflow-auto custom-scroll">
 
-    <header class="shrink-0 flex flex-col gap-1.5">
-      <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight">Settings</h1>
-      <p class="text-sm sm:text-base text-fg-3">
+    <header class="shrink-0 flex flex-col gap-2">
+      <h1
+        class="font-semibold tracking-[-0.02em] leading-[0.95]"
+        style="font-size: clamp(2.5rem, 3vw + 1.5rem, 4.5rem);">
+        Settings
+      </h1>
+      <p class="text-sm sm:text-base text-fg-3 max-w-prose">
         Playlists, downloads, cache, and the app itself.
       </p>
     </header>
@@ -54,23 +58,43 @@ import {
       <h2 class="text-eyebrow font-semibold uppercase tracking-wide text-fg-3">Preferences</h2>
       <div class="flex flex-col gap-4">
 
-        <!-- Display: font scale (TV-distance knob) -->
+        <!-- Display: theme + font scale -->
         <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
           <div class="flex flex-col gap-1">
             <h3 class="text-base font-semibold">Display</h3>
             <p class="text-xs text-fg-3 max-w-prose">
-              Bumps the base font size for everything. Use Large or X-Large when viewing on a TV from across the room.
+              Theme and base font size. System theme follows your OS preference.
             </p>
           </div>
-          <div
-            id="settings-font-scale"
-            class="flex flex-wrap gap-2"
-            role="radiogroup"
-            aria-label="Font scale">
-            <button type="button" data-scale="1"     aria-pressed="false" class="font-scale-btn btn">Default</button>
-            <button type="button" data-scale="1.125" aria-pressed="false" class="font-scale-btn btn">Medium</button>
-            <button type="button" data-scale="1.25"  aria-pressed="false" class="font-scale-btn btn">Large</button>
-            <button type="button" data-scale="1.5"   aria-pressed="false" class="font-scale-btn btn">X-Large</button>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-eyebrow font-medium uppercase text-fg-3">Theme</span>
+            <div
+              id="settings-theme"
+              class="flex flex-wrap gap-2"
+              role="radiogroup"
+              aria-label="Theme">
+              <button type="button" data-theme="system" aria-pressed="false" class="theme-btn btn">System</button>
+              <button type="button" data-theme="light"  aria-pressed="false" class="theme-btn btn">Light</button>
+              <button type="button" data-theme="dark"   aria-pressed="false" class="theme-btn btn">Dark</button>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-eyebrow font-medium uppercase text-fg-3">Font scale</span>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Bumps the base font size. Use Large or X-Large when viewing on a TV from across the room.
+            </p>
+            <div
+              id="settings-font-scale"
+              class="flex flex-wrap gap-2"
+              role="radiogroup"
+              aria-label="Font scale">
+              <button type="button" data-scale="1"     aria-pressed="false" class="font-scale-btn btn">Default</button>
+              <button type="button" data-scale="1.125" aria-pressed="false" class="font-scale-btn btn">Medium</button>
+              <button type="button" data-scale="1.25"  aria-pressed="false" class="font-scale-btn btn">Large</button>
+              <button type="button" data-scale="1.5"   aria-pressed="false" class="font-scale-btn btn">X-Large</button>
+            </div>
           </div>
           <script is:inline>
             try {
@@ -82,6 +106,14 @@ import {
                 for (var i = 0; i < btns.length; i++) {
                   var v = parseFloat(btns[i].getAttribute("data-scale") || "1");
                   btns[i].setAttribute("aria-pressed", Math.abs(v - s) < 0.001 ? "true" : "false");
+                }
+              }
+              var t = localStorage.getItem("xt_theme") || "system";
+              var tGroup = document.getElementById("settings-theme");
+              if (tGroup) {
+                var tBtns = tGroup.querySelectorAll(".theme-btn");
+                for (var j = 0; j < tBtns.length; j++) {
+                  tBtns[j].setAttribute("aria-pressed", tBtns[j].getAttribute("data-theme") === t ? "true" : "false");
                 }
               }
             } catch (e) {}
@@ -287,7 +319,7 @@ import {
           </div>
           <div class="flex flex-col gap-0.5 min-w-0 col-span-2 sm:col-span-1">
             <dt class="text-fg-3 text-eyebrow font-medium uppercase">Account expires</dt>
-            <dd id="account-expiration" class="text-fg tabular-nums truncate">-</dd>
+            <dd data-account-expiration="raw" class="text-fg tabular-nums truncate">-</dd>
           </div>
         </dl>
 
@@ -418,6 +450,7 @@ import {
     } from "@/scripts/lib/playlist-rows.js"
     import { injectVersion } from "@/scripts/version.js"
     import { injectExpirationDate } from "@/scripts/expiration.js"
+    import { attachDialogSpatialNav } from "@/scripts/lib/dialog-spatial-nav.js"
     import {
       UA_PRESETS,
       getUserAgent,
@@ -438,29 +471,7 @@ import {
     } from "@/scripts/lib/downloads.js"
 
     injectVersion()
-    // injectExpirationDate writes "Account expires: <date>" because other
-    // pages render that string standalone in the corner. This page already
-    // labels the cell, so strip the prefix once injection completes.
-    const expirationPromise = injectExpirationDate()
-    if (expirationPromise && typeof expirationPromise.finally === "function") {
-      expirationPromise.finally(stripExpirationPrefix)
-    }
-    const expirationEl = document.getElementById("account-expiration")
-    if (expirationEl) {
-      const observer = new MutationObserver(stripExpirationPrefix)
-      observer.observe(expirationEl, { childList: true, characterData: true, subtree: true })
-    }
-    function stripExpirationPrefix() {
-      const el = document.getElementById("account-expiration")
-      if (!el) return
-      const txt = (el.textContent || "").trim()
-      const stripped = txt.replace(/^Account expires:\s*/i, "")
-      if (!txt) {
-        if (el.textContent !== "-") el.textContent = "-"
-      } else if (stripped !== txt) {
-        el.textContent = stripped || "-"
-      }
-    }
+    injectExpirationDate()
 
     const playlistsEl = document.getElementById("settings-playlists")
     const refreshBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("settings-refresh-active"))
@@ -471,6 +482,7 @@ import {
     const resetBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("settings-reset-all"))
     const resetMsgEl = document.getElementById("settings-reset-msg")
     const resetDialog = /** @type {HTMLDialogElement|null} */ (document.getElementById("settings-reset-dialog"))
+    if (resetDialog) attachDialogSpatialNav(resetDialog, { defaultElement: "#settings-reset-cancel" })
     const resetCancelBtn = document.getElementById("settings-reset-cancel")
     const resetConfirmBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("settings-reset-confirm"))
 
@@ -771,6 +783,43 @@ import {
       applyFontScale(v)
     })
     syncFontScaleButtons()
+
+    // ---------------------------------------------------------------------
+    // Theme: light / dark / system. Persisted to xt_theme; applied by the
+    // inline script in <head> on page load. CSS uses `light-dark()` so the
+    // single `colorScheme` property on :root drives the whole palette.
+    // ---------------------------------------------------------------------
+    const themeGroup = document.getElementById("settings-theme")
+    function readTheme() {
+      try {
+        return localStorage.getItem("xt_theme") || "system"
+      } catch {
+        return "system"
+      }
+    }
+    function applyTheme(t) {
+      if (t === "light") document.documentElement.style.colorScheme = "light"
+      else if (t === "dark") document.documentElement.style.colorScheme = "dark"
+      else document.documentElement.style.colorScheme = ""
+      try {
+        if (t === "system") localStorage.removeItem("xt_theme")
+        else localStorage.setItem("xt_theme", t)
+      } catch {}
+      syncThemeButtons()
+    }
+    function syncThemeButtons() {
+      const current = readTheme()
+      for (const btn of themeGroup?.querySelectorAll(".theme-btn") || []) {
+        btn.setAttribute("aria-pressed", String(btn.dataset.theme === current))
+      }
+    }
+    themeGroup?.addEventListener("click", (e) => {
+      const t = /** @type {HTMLElement} */ (e.target)
+      const btn = t.closest(".theme-btn")
+      if (!btn) return
+      applyTheme(btn.dataset.theme || "system")
+    })
+    syncThemeButtons()
 
     // ---------------------------------------------------------------------
     // Live TV layout: default EPG visibility + channel column width.

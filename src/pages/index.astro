@@ -15,7 +15,7 @@ import { IconDeviceTv, IconMovie, IconStack2 } from "@tabler/icons-svelte";
 			<a
 				href="/livetv"
 				aria-label="Watch Live TV"
-				style="animation-delay: 50ms"
+				style="animation-delay: 50ms; view-transition-name: active-nav-livetv;"
 				class="tile-enter lg:row-span-2 landscape:row-span-2 group relative flex flex-col justify-between
 					rounded-2xl border border-line bg-surface
 					p-6 sm:p-8 lg:p-12
@@ -39,12 +39,14 @@ import { IconDeviceTv, IconMovie, IconStack2 } from "@tabler/icons-svelte";
 				</div>
 				<div class="mt-auto pt-6">
 					<h2
-						class="text-fg leading-[0.95] tracking-tight"
-						style="font-size: clamp(2.25rem, 4vw + 1.5rem, 6rem);">
+						class="font-semibold tracking-[-0.02em] leading-[0.92] text-fg
+							group-hover:text-accent group-focus-visible:text-accent
+							transition-colors duration-200 ms-[-0.05em]"
+						style="font-size: clamp(3rem, 6vw + 1.5rem, 8.5rem);">
 						Live TV
 					</h2>
-					<p class="mt-3 text-sm sm:text-base text-fg-2 max-w-md font-sans">
-						Channels and what's on now.
+					<p class="mt-4 sm:mt-5 text-sm sm:text-base text-fg-2 max-w-md font-sans tracking-tight">
+						Channels, and what's on right now.
 					</p>
 				</div>
 			</a>
@@ -52,7 +54,7 @@ import { IconDeviceTv, IconMovie, IconStack2 } from "@tabler/icons-svelte";
 			<a
 				href="/movies"
 				aria-label="Browse Movies"
-				style="animation-delay: 150ms"
+				style="animation-delay: 150ms; view-transition-name: active-nav-movies;"
 				class="tile-enter group flex flex-col justify-between
 					rounded-2xl border border-line bg-surface
 					p-5 sm:p-6
@@ -68,10 +70,12 @@ import { IconDeviceTv, IconMovie, IconStack2 } from "@tabler/icons-svelte";
 					class="size-9 sm:size-10 lg:size-12 text-fg-3 transition-colors group-hover:text-accent group-focus-visible:text-accent"
 				/>
 				<div class="mt-auto pt-4">
-					<h2 class="text-xl sm:text-2xl font-semibold tracking-tight text-fg">
+					<h2 class="text-2xl sm:text-3xl lg:text-5xl font-semibold tracking-[-0.02em] leading-[0.95]
+						text-fg group-hover:text-accent group-focus-visible:text-accent
+						transition-colors duration-200 ms-[-0.05em]">
 						Movies
 					</h2>
-					<p class="mt-1 text-sm text-fg-2">
+					<p class="mt-1.5 text-sm text-fg-2">
 						Browse the library.
 					</p>
 				</div>
@@ -80,7 +84,7 @@ import { IconDeviceTv, IconMovie, IconStack2 } from "@tabler/icons-svelte";
 			<a
 				href="/series"
 				aria-label="Browse Series"
-				style="animation-delay: 250ms"
+				style="animation-delay: 250ms; view-transition-name: active-nav-series;"
 				class="tile-enter group flex flex-col justify-between
 					rounded-2xl border border-line bg-surface
 					p-5 sm:p-6
@@ -96,10 +100,12 @@ import { IconDeviceTv, IconMovie, IconStack2 } from "@tabler/icons-svelte";
 					class="size-9 sm:size-10 lg:size-12 text-fg-3 transition-colors group-hover:text-accent group-focus-visible:text-accent"
 				/>
 				<div class="mt-auto pt-4">
-					<h2 class="text-xl sm:text-2xl font-semibold tracking-tight text-fg">
+					<h2 class="text-2xl sm:text-3xl lg:text-5xl font-semibold tracking-[-0.02em] leading-[0.95]
+						text-fg group-hover:text-accent group-focus-visible:text-accent
+						transition-colors duration-200 ms-[-0.05em]">
 						Series
 					</h2>
-					<p class="mt-1 text-sm text-fg-2">
+					<p class="mt-1.5 text-sm text-fg-2">
 						Shows and full seasons.
 					</p>
 				</div>

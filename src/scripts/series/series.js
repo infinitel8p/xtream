@@ -26,6 +26,10 @@ import {
   DOWNLOADS_LIST_EVENT,
   DOWNLOAD_PROGRESS_EVENT,
 } from "@/scripts/lib/downloads.js"
+import { morphIntoDetail, clearAmbient } from "@/scripts/lib/morph-detail.js"
+import { attachPlayerFocusKeeper } from "@/scripts/lib/player-focus-keeper.js"
+
+const detailAmbient = document.getElementById("series-detail-ambient")
 
 const SERIES_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -295,7 +299,7 @@ function makeCard(s, idx) {
   playBtn.className =
     "play-btn block w-full text-left outline-none cursor-pointer"
   playBtn.title = s.name || ""
-  playBtn.addEventListener("click", () => openDetail(s))
+  playBtn.addEventListener("click", () => openDetail(s, card))
 
   const posterWrap = document.createElement("div")
   posterWrap.className =
@@ -689,6 +693,7 @@ const ensurePlayer = async () => {
       },
     },
   })
+  attachPlayerFocusKeeper(vjs)
   return vjs
 }
 
@@ -934,8 +939,7 @@ function syncEpisodeDownloadButtons() {
 document.addEventListener(DOWNLOAD_PROGRESS_EVENT, syncEpisodeDownloadButtons)
 document.addEventListener(DOWNLOADS_LIST_EVENT, syncEpisodeDownloadButtons)
 
-async function openDetail(series) {
-  if (!detailDlg || !series) return
+function prepareAndShowDetail(series) {
   currentDetailSeries = series
   currentDetailEpisodes = null
   currentSeason = ""
@@ -990,15 +994,22 @@ async function openDetail(series) {
   if (typeof detailDlg.showModal === "function") detailDlg.showModal()
   else detailDlg.setAttribute("open", "")
 
-  setTimeout(() => {
-    try { window.SpatialNavigation?.makeFocusable?.() } catch {}
-    /** @type {HTMLButtonElement|null} */ (detailFav)?.focus?.()
-  }, 0)
+  try { window.SpatialNavigation?.makeFocusable?.() } catch {}
+  /** @type {HTMLButtonElement|null} */ (detailFav)?.focus?.()
+}
+
+async function openDetail(series, fromCard) {
+  if (!detailDlg || !series) return
+
+  morphIntoDetail({
+    fromCard,
+    toHero: detailPoster,
+    ambient: detailAmbient,
+    posterUrl: series.logo || null,
+    openDialog: () => prepareAndShowDetail(series),
+  })
 
   try {
-    // Some Xtream backends want `series_id=`, others `series=`. api.md says
-    // `series=`, but real-world providers commonly only accept `series_id=`.
-    // Send both - the server picks whichever it recognises.
     const r = await providerFetch(
       buildApiUrl(creds, "get_series_info", {
         series_id: String(series.id),
@@ -1009,8 +1020,6 @@ async function openDetail(series) {
     const data = await r.json()
     const info = data?.info || {}
     const seasons = Array.isArray(data?.seasons) ? data.seasons : []
-    // `episodes` is usually an object keyed by season number, but some
-    // providers return an array. Normalise to the object shape.
     let episodesByKey = {}
     if (data?.episodes && typeof data.episodes === "object") {
       if (Array.isArray(data.episodes)) {
@@ -1024,11 +1033,8 @@ async function openDetail(series) {
       }
     }
 
-    if (currentDetailSeries?.id !== series.id) return // user closed/swapped
+    if (currentDetailSeries?.id !== series.id) return
 
-    // If no episodes came back, log the raw response so it's diagnosable
-    // - this is how every "no episodes" issue gets unstuck (provider
-    // returns a different shape, or returns empty when given `series=`).
     if (!Object.keys(episodesByKey).length) {
       console.warn(
         "[series] get_series_info returned no episodes for",
@@ -1080,8 +1086,6 @@ async function playEpisode(episode) {
   if (!currentDetailSeries || !episode) return
   const src = buildEpisodeStreamUrl(episode)
 
-  // Recents at the SERIES level - what users want surfaced as a row, not
-  // a stream of "S2E5"-style episode-level entries that bury the show name.
   if (activePlaylistId) {
     pushRecent(
       activePlaylistId,
@@ -1128,6 +1132,7 @@ detailDlg?.addEventListener("close", () => {
   if (nowPlayingLabel) nowPlayingLabel.textContent = ""
   const videoEl = document.getElementById("series-player")
   videoEl?.setAttribute("hidden", "")
+  clearAmbient(detailAmbient)
   currentDetailSeries = null
   currentDetailEpisodes = null
   currentSeason = ""

@@ -24,6 +24,10 @@ import {
   cancelDownload,
   DOWNLOAD_PROGRESS_EVENT,
 } from "@/scripts/lib/downloads.js"
+import { morphIntoDetail, clearAmbient } from "@/scripts/lib/morph-detail.js"
+import { attachPlayerFocusKeeper } from "@/scripts/lib/player-focus-keeper.js"
+
+const detailAmbient = document.getElementById("movie-detail-ambient")
 
 const VOD_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -90,12 +94,9 @@ let activePlaylistId = ""
 
 const hiddenCats = new Set()
 
-// Sentinels for pseudo-categories. Values can't collide with real category
-// names because they start with "__".
 const CAT_FAVORITES = "__favorites__"
 const CAT_RECENTS = "__recents__"
 
-// Tabler star icons inlined as SVG strings (we build DOM in JS).
 const STAR_OUTLINE =
   '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17.75l-6.18 3.25 1.18-6.88L2 9.25l6.91-1L12 2l3.09 6.25 6.91 1-5 4.87 1.18 6.88z"/></svg>'
 const STAR_FILLED =
@@ -286,7 +287,7 @@ function makeCard(m, idx) {
   playBtn.className =
     "play-btn block w-full text-left outline-none cursor-pointer"
   playBtn.title = m.name || ""
-  playBtn.addEventListener("click", () => openDetail(m))
+  playBtn.addEventListener("click", () => openDetail(m, card))
 
   const posterWrap = document.createElement("div")
   posterWrap.className = "aspect-[2/3] w-full bg-surface-2 overflow-hidden relative"
@@ -705,6 +706,7 @@ const ensurePlayer = async () => {
       },
     },
   })
+  attachPlayerFocusKeeper(vjs)
   return vjs
 }
 
@@ -737,16 +739,12 @@ let currentDetailSrc = ""
 function syncDetailFavButton() {
   if (!detailFav || !currentDetailMovie || !activePlaylistId) return
   const fav = isFavorite(activePlaylistId, "vod", currentDetailMovie.id)
-  // Action-clear labels: tell the user what'll happen on click, not just
-  // describe state. "Remove from favorites" beats "★ In favorites" - the
-  // latter looks like a status, not a button.
   detailFav.textContent = fav ? "Remove from favorites" : "Add to favorites"
   detailFav.classList.toggle("text-accent", fav)
   detailFav.setAttribute("aria-pressed", String(fav))
 }
 
-async function openDetail(movie) {
-  if (!detailDlg || !movie) return
+function prepareAndShowDetail(movie) {
   currentDetailMovie = movie
   currentDetailSrc = ""
 
@@ -799,13 +797,21 @@ async function openDetail(movie) {
   if (typeof detailDlg.showModal === "function") detailDlg.showModal()
   else detailDlg.setAttribute("open", "")
 
-  // Pull focus to Play so OK on a remote starts playback immediately.
-  setTimeout(() => {
-    window.SpatialNavigation?.makeFocusable?.()
-    /** @type {HTMLButtonElement|null} */ (detailPlay)?.focus?.()
-  }, 0)
+  window.SpatialNavigation?.makeFocusable?.()
+  /** @type {HTMLButtonElement|null} */ (detailPlay)?.focus?.()
+}
 
-  // Fetch info in the background to fill plot/meta + prepare the stream URL.
+async function openDetail(movie, fromCard) {
+  if (!detailDlg || !movie) return
+
+  morphIntoDetail({
+    fromCard,
+    toHero: detailPoster,
+    ambient: detailAmbient,
+    posterUrl: movie.logo || null,
+    openDialog: () => prepareAndShowDetail(movie),
+  })
+
   try {
     const r = await providerFetch(
       buildApiUrl(creds, "get_vod_info", { vod_id: String(movie.id) })
@@ -837,7 +843,6 @@ async function openDetail(movie) {
         ext
     }
 
-    // Bail if the user already closed/swapped detail while we were fetching.
     if (currentDetailMovie?.id !== movie.id) return
 
     currentDetailSrc = src
@@ -877,7 +882,6 @@ async function openDetail(movie) {
 async function startPlayback() {
   if (!currentDetailMovie) return
   if (!currentDetailSrc) {
-    // get_vod_info might still be in flight - retry briefly.
     let waited = 0
     while (!currentDetailSrc && waited < 4000) {
       await new Promise((r) => setTimeout(r, 100))
@@ -918,9 +922,6 @@ detailFav?.addEventListener("click", () => {
   toggleFavorite(activePlaylistId, "vod", currentDetailMovie.id)
 })
 
-/** Tracks the download started from this modal so we can mirror its
- *  progress onto the button label. Cleared on terminal status or dialog
- *  close. */
 let activeDownloadId = null
 function detachDownloadProgress() {
   document.removeEventListener(DOWNLOAD_PROGRESS_EVENT, onDownloadProgress)
@@ -1014,6 +1015,7 @@ detailDlg?.addEventListener("close", () => {
   const videoEl = document.getElementById("movie-player")
   videoEl?.setAttribute("hidden", "")
   detachDownloadProgress()
+  clearAmbient(detailAmbient)
   currentDetailMovie = null
   currentDetailSrc = ""
 })

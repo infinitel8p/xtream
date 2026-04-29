@@ -91,6 +91,25 @@ const settingsActive = path === "/settings" || path.startsWith("/settings/")
     })}
   </nav>
 
+  <a
+    href="/settings"
+    data-account-expiration="banner"
+    hidden
+    aria-label="Account expiration warning"
+    title="Account expiration"
+    class="hidden lg:flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium tabular-nums
+           border border-warn/30 bg-warn/10 text-warn
+           data-[state=critical]:border-bad/40 data-[state=critical]:bg-bad/10 data-[state=critical]:text-bad
+           data-[state=expired]:border-bad/40 data-[state=expired]:bg-bad/10 data-[state=expired]:text-bad
+           hover:border-current focus-visible:border-current
+           outline-none transition-colors">
+  </a>
+
+  <div
+    data-account-expiration
+    class="hidden lg:block px-2.5 text-2xs text-fg-3 tabular-nums truncate empty:hidden">
+  </div>
+
   <div class="flex flex-col gap-1 pt-2 border-t border-line">
     <PlaylistSwitcher />
     <a
@@ -164,3 +183,9 @@ const settingsActive = path === "/settings" || path.startsWith("/settings/")
     )
   })}
 </nav>
+
+<script>
+  import { injectExpirationDate } from "@/scripts/expiration.js"
+  injectExpirationDate()
+  document.addEventListener("xt:active-changed", () => injectExpirationDate())
+</script>

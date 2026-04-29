@@ -57,15 +57,15 @@ import { IconChevronDown, IconX } from "@tabler/icons-svelte";
 				p-2 pb-4">
 		</section>
 
-		<!-- Detail / playback modal: poster (or player) on top, then series
-		     metadata, season tabs, and an episode list. -->
+		<!-- Detail / playback modal -->
 		<dialog
 			id="series-detail-dialog"
 			aria-labelledby="series-detail-title"
 			class="fixed inset-0 m-auto rounded-2xl border border-line bg-surface text-fg p-0
 				w-[min(64rem,calc(100vw-2rem))] h-[min(92dvh,56rem)]
-				backdrop:bg-black/70">
-			<div class="flex flex-col h-full">
+				backdrop:bg-black/70 overflow-hidden isolate">
+			<div data-modal-ambient id="series-detail-ambient" aria-hidden="true"></div>
+			<div class="relative z-10 flex flex-col h-full">
 				<div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-line shrink-0">
 					<div class="min-w-0 flex flex-col">
 						<h2
@@ -196,25 +196,24 @@ import { IconChevronDown, IconX } from "@tabler/icons-svelte";
 			class="fixed bottom-[max(0.5rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))] text-2xs text-fg-3 opacity-70 tabular-nums pointer-events-none">
 			Loading…
 		</div>
-		<div
-			id="account-expiration"
-			class="fixed bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] text-2xs text-fg-3 opacity-70 tabular-nums pointer-events-none">
-			Loading…
-		</div>
 	</main>
 
 	<script>
 		import "../scripts/series/series.js";
 		import "../scripts/updater-startup.js";
 		import { injectVersion } from "../scripts/version.js";
-		import { injectExpirationDate } from "../scripts/expiration.js";
+		import { attachDialogSpatialNav } from "../scripts/lib/dialog-spatial-nav.js";
 		injectVersion();
-		injectExpirationDate();
 
 		const trigger = document.getElementById("series-category-picker-trigger");
 		const dlg = /** @type {HTMLDialogElement|null} */ (
 			document.getElementById("series-category-picker-dialog")
 		);
+		if (dlg) attachDialogSpatialNav(dlg, { defaultElement: "#series-category-search" });
+		const detailDlg = /** @type {HTMLDialogElement|null} */ (
+			document.getElementById("series-detail-dialog")
+		);
+		if (detailDlg) attachDialogSpatialNav(detailDlg, { defaultElement: "#series-detail-fav" });
 		const closeBtn = document.getElementById("series-category-picker-close");
 		const labelEl = document.getElementById("series-category-picker-label");
 		const categoryList = document.getElementById("series-category-list");
