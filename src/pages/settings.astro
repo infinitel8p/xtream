@@ -970,6 +970,7 @@ import {
     function statusLabel(s) {
       switch (s) {
         case "downloading": return "Downloading"
+        case "queued":      return "Queued"
         case "done":        return "Done"
         case "error":       return "Failed"
         case "stalled":     return "Stalled"
@@ -985,6 +986,7 @@ import {
         case "error":     return "text-bad"
         case "stalled":   return "text-warn"
         case "paused":    return "text-fg-2"
+        case "queued":    return "text-fg-3"
         case "cancelled": return "text-fg-3"
         default:          return "text-accent"
       }
@@ -993,7 +995,9 @@ import {
     function renderDownloads() {
       if (!downloadsListEl) return
       const list = listDownloads()
-      const hasFinished = list.some((d) => d.status !== "downloading")
+      const hasFinished = list.some(
+        (d) => d.status !== "downloading" && d.status !== "queued"
+      )
       if (downloadsClearBtn) {
         /** @type {HTMLButtonElement} */ (downloadsClearBtn).disabled = !hasFinished
         downloadsClearBtn.classList.toggle("opacity-50", !hasFinished)
@@ -1054,6 +1058,11 @@ import {
         if (d.status === "downloading") {
           actions.append(
             mkAction("Pause", `Pause ${d.title}`, () => pauseDownload(d.id))
+          )
+        } else if (d.status === "queued") {
+          actions.append(
+            mkAction("Cancel", `Cancel queued ${d.title}`, () => pauseDownload(d.id)),
+            mkAction("Remove", `Remove ${d.title}`, () => removeDownload(d.id))
           )
         } else if (d.status === "stalled" || d.status === "paused" || d.status === "error") {
           actions.append(

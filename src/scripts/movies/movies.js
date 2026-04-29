@@ -934,6 +934,9 @@ function onDownloadProgress(e) {
       detailDownloadLabel.textContent =
         pct !== null ? `Downloading ${pct}%` : "Downloading…"
     }
+  } else if (d.status === "queued") {
+    if (detailDownloadLabel) detailDownloadLabel.textContent = "Queued…"
+    detailDownload.title = "Waiting for an active download to finish"
   } else if (d.status === "done") {
     if (detailDownloadLabel) detailDownloadLabel.textContent = "Saved"
     detailDownload.removeAttribute("disabled")

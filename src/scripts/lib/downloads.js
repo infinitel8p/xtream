@@ -12,6 +12,11 @@ const EVT_LIST = "xt:downloads-changed"
 const STALL_WINDOW_MS = 30_000
 const STALL_CHECK_MS = 5_000
 
+const MAX_CONCURRENT = 2
+
+/** @type {string[]} ids waiting for an active slot */
+const queuedIds = []
+
 function readState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -188,8 +193,6 @@ async function runDownload(id) {
       if (done) break
       if (!value || !value.length) continue
 
-      // Stream the chunk straight to disk — never buffer the whole file in
-      // memory. Append mode preserves what we already wrote (resume case).
       await fs.writeFile(item.path, value, { append: true })
 
       received += value.length
@@ -223,6 +226,17 @@ async function runDownload(id) {
   } finally {
     if (stallTimer) clearTimeout(stallTimer)
     activeAborts.delete(id)
+    tryRunNext()
+  }
+}
+
+function tryRunNext() {
+  while (activeAborts.size < MAX_CONCURRENT && queuedIds.length > 0) {
+    const nextId = queuedIds.shift()
+    if (!nextId) continue
+    const next = getItem(nextId)
+    if (!next || next.status !== "queued") continue
+    runDownload(nextId)
   }
 }
 
@@ -239,6 +253,7 @@ export async function startDownload({ url, title, ext }) {
   const fullPath = joinPath(dir, filename)
 
   const id = uuid()
+  const willRun = activeAborts.size < MAX_CONCURRENT
   const item = {
     id,
     url,
@@ -246,7 +261,7 @@ export async function startDownload({ url, title, ext }) {
     path: fullPath,
     bytesDone: 0,
     bytesTotal: 0,
-    status: "downloading",
+    status: willRun ? "downloading" : "queued",
     startedAt: Date.now(),
     error: "",
   }
@@ -254,40 +269,57 @@ export async function startDownload({ url, title, ext }) {
   list.unshift(item)
   writeState(list)
 
-  runDownload(id)
+  if (willRun) runDownload(id)
+  else queuedIds.push(id)
   return id
 }
 
 export function resumeDownload(id) {
   if (!isTauri) return
   if (activeAborts.has(id)) return
+  if (queuedIds.includes(id)) return
   const item = getItem(id)
   if (!item) return
   if (item.status === "done") return
-  runDownload(id)
+  if (activeAborts.size < MAX_CONCURRENT) {
+    runDownload(id)
+  } else {
+    updateItem(id, { status: "queued", error: "" })
+    queuedIds.push(id)
+  }
 }
 
 export function pauseDownload(id) {
   const ac = activeAborts.get(id)
-  if (ac) ac.abort("paused")
+  if (ac) {
+    ac.abort("paused")
+    return
+  }
+
+  const qIdx = queuedIds.indexOf(id)
+  if (qIdx >= 0) {
+    queuedIds.splice(qIdx, 1)
+    updateItem(id, { status: "paused", error: "" })
+  }
 }
 
 export function cancelDownload(id) {
-  // Same shape as pause — leaves the partial file so the user can resume.
-  // To delete the partial, use removeDownload.
-  const ac = activeAborts.get(id)
-  if (ac) ac.abort("paused")
+  pauseDownload(id)
 }
 
 export function removeDownload(id) {
   const ac = activeAborts.get(id)
   if (ac) ac.abort("paused")
+  const qIdx = queuedIds.indexOf(id)
+  if (qIdx >= 0) queuedIds.splice(qIdx, 1)
   const list = readState().filter((d) => d.id !== id)
   writeState(list)
+
+  tryRunNext()
 }
 
 export function clearFinishedDownloads() {
-  const inFlight = new Set(["downloading"])
+  const inFlight = new Set(["downloading", "queued"])
   const list = readState().filter((d) => inFlight.has(d.status))
   writeState(list)
 }
@@ -295,18 +327,25 @@ export function clearFinishedDownloads() {
 export const DOWNLOADS_LIST_EVENT = EVT_LIST
 export const DOWNLOAD_PROGRESS_EVENT = EVT_PROGRESS
 
-// On page load, the previous session's in-flight downloads are dead — the JS
-// that was reading their stream is gone. Flip them to paused so the user has
-// a clear Resume action.
 ;(() => {
   const list = readState()
+  const wasInFlight = []
+  const wasQueued = []
   let dirty = false
   for (const d of list) {
     if (d.status === "downloading") {
       d.status = "paused"
       d.error = ""
+      wasInFlight.push(d.id)
+      dirty = true
+    } else if (d.status === "queued") {
+      d.status = "paused"
+      d.error = ""
+      wasQueued.push(d.id)
       dirty = true
     }
   }
   if (dirty) writeState(list)
+  for (const id of wasInFlight) resumeDownload(id)
+  for (const id of wasQueued) resumeDownload(id)
 })()

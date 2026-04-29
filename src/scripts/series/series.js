@@ -19,6 +19,7 @@ import { providerFetch } from "@/scripts/lib/provider-fetch.js"
 import {
   startDownload,
   resumeDownload,
+  pauseDownload,
   isDownloadable,
   inferExt,
   listDownloads,
@@ -779,8 +780,9 @@ function downloadButtonState(d) {
   switch (d.status) {
     case "downloading": {
       const pct = d.bytesTotal > 0 ? Math.floor((d.bytesDone / d.bytesTotal) * 100) : null
-      return { label: pct !== null ? `${pct}%` : "…", disabled: true, title: "Downloading" }
+      return { label: pct !== null ? `${pct}%` : "…", disabled: false, title: "Tap to pause" }
     }
+    case "queued":    return { label: "Queued", disabled: false, title: "Waiting for a slot - tap to cancel" }
     case "done":      return { label: "Saved", disabled: true, title: d.path ? `Saved to ${d.path}` : "Saved" }
     case "paused":    return { label: "Resume", disabled: false, title: "Paused - tap to resume" }
     case "stalled":   return { label: "Retry", disabled: false, title: "Stalled - tap to retry" }
@@ -873,7 +875,11 @@ function renderEpisodes() {
       dlBtn.addEventListener("click", async (e) => {
         e.stopPropagation()
         const existing = findDownloadByUrl(epUrl)
-        if (existing?.status === "downloading") return
+        // Active or queued: clicking pauses / cancels in place.
+        if (existing?.status === "downloading" || existing?.status === "queued") {
+          pauseDownload(existing.id)
+          return
+        }
         // Resume the existing entry if it's just paused / stalled / errored
         // - starting a fresh download would orphan the partial file.
         if (
