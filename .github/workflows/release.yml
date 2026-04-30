@@ -242,7 +242,7 @@ jobs:
               '<img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="60"/>',
               '</a>',
               '',
-              '[![Get it from Microsoft](https://get.microsoft.com/images/en-us%20dark.svg)](https://apps.microsoft.com/store/detail/9WZDNCRFHVJL)',
+              '[![Get it from Microsoft](https://get.microsoft.com/images/en-us%20dark.svg)](https://apps.microsoft.com/store/detail/9NN162Z0WXSR)',
             ].join('\n')
 
             const { data } = await github.rest.repos.createRelease({

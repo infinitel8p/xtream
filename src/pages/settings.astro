@@ -13,20 +13,25 @@ import {
 ---
 
 <Layout pageTitle="Settings">
-  <main
-    class="w-full max-w-3xl mx-auto px-4 md:px-6 lg:px-8 pt-6 sm:pt-10 pb-12
-           flex flex-col gap-8 sm:gap-10 flex-1 min-h-0 overflow-auto custom-scroll">
+  <main class="flex-1 min-h-0 overflow-auto custom-scroll">
+    <div
+      class="w-full max-w-3xl mx-auto px-4 md:px-6 lg:px-8 pt-6 sm:pt-10 pb-12
+             flex flex-col gap-8 sm:gap-10">
 
-    <header class="shrink-0 flex flex-col gap-1.5">
-      <h1 class="text-3xl sm:text-4xl font-semibold tracking-tight">Settings</h1>
-      <p class="text-sm sm:text-base text-fg-3">
-        Playlists, downloads, cache, and the app itself.
+    <header class="shrink-0 flex flex-col gap-2">
+      <h1
+        class="font-semibold tracking-[-0.02em] leading-[0.95]"
+        style="font-size: clamp(2.5rem, 3vw + 1.5rem, 4.5rem);">
+        Settings
+      </h1>
+      <p class="text-sm sm:text-base text-fg-3 max-w-prose">
+        Playlists, preferences, cache, and the app itself.
       </p>
     </header>
 
     <!-- Group: Playlists -->
     <section class="flex flex-col gap-3">
-      <h2 class="text-eyebrow font-semibold uppercase tracking-wide text-fg-3">Playlists</h2>
+      <h2 class="text-xs font-semibold uppercase tracking-widest text-fg-2">Playlists</h2>
       <div class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
         <div
           id="settings-playlists"
@@ -51,41 +56,105 @@ import {
 
     <!-- Group: Preferences -->
     <section class="flex flex-col gap-3">
-      <h2 class="text-eyebrow font-semibold uppercase tracking-wide text-fg-3">Preferences</h2>
+      <h2 class="text-xs font-semibold uppercase tracking-widest text-fg-2">Preferences</h2>
       <div class="flex flex-col gap-4">
 
-        <!-- Display: font scale (TV-distance knob) -->
+        <!-- Display: theme + font scale -->
         <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
           <div class="flex flex-col gap-1">
             <h3 class="text-base font-semibold">Display</h3>
             <p class="text-xs text-fg-3 max-w-prose">
-              Bumps the base font size for everything. Use Large or X-Large when viewing on a TV from across the room.
+              Theme and base font size. System theme follows your OS preference.
             </p>
           </div>
-          <div
-            id="settings-font-scale"
-            class="flex flex-wrap gap-2"
-            role="radiogroup"
-            aria-label="Font scale">
-            <button type="button" data-scale="1"     aria-pressed="false" class="font-scale-btn btn">Default</button>
-            <button type="button" data-scale="1.125" aria-pressed="false" class="font-scale-btn btn">Medium</button>
-            <button type="button" data-scale="1.25"  aria-pressed="false" class="font-scale-btn btn">Large</button>
-            <button type="button" data-scale="1.5"   aria-pressed="false" class="font-scale-btn btn">X-Large</button>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-eyebrow font-medium uppercase text-fg-3">Theme</span>
+            <div
+              id="settings-theme"
+              class="flex flex-wrap gap-2"
+              role="radiogroup"
+              aria-label="Theme">
+              <button type="button" data-theme="system" aria-pressed="false" class="theme-btn btn">System</button>
+              <button type="button" data-theme="light"  aria-pressed="false" class="theme-btn btn">Light</button>
+              <button type="button" data-theme="dark"   aria-pressed="false" class="theme-btn btn">Dark</button>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-eyebrow font-medium uppercase text-fg-3">Font scale</span>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Bumps the base font size. Use Large or X-Large when viewing on a TV from across the room.
+            </p>
+            <div
+              id="settings-font-scale"
+              class="flex flex-wrap gap-2"
+              role="radiogroup"
+              aria-label="Font scale">
+              <button type="button" data-scale="1"     aria-pressed="false" class="font-scale-btn btn">Default</button>
+              <button type="button" data-scale="1.125" aria-pressed="false" class="font-scale-btn btn">Medium</button>
+              <button type="button" data-scale="1.25"  aria-pressed="false" class="font-scale-btn btn">Large</button>
+              <button type="button" data-scale="1.5"   aria-pressed="false" class="font-scale-btn btn">X-Large</button>
+            </div>
           </div>
           <script is:inline>
             try {
-              var s = parseFloat(localStorage.getItem("xt_font_scale") || "1");
-              if (!isFinite(s) || s < 0.75 || s > 2) s = 1;
-              var group = document.getElementById("settings-font-scale");
-              if (group) {
-                var btns = group.querySelectorAll(".font-scale-btn");
-                for (var i = 0; i < btns.length; i++) {
-                  var v = parseFloat(btns[i].getAttribute("data-scale") || "1");
-                  btns[i].setAttribute("aria-pressed", Math.abs(v - s) < 0.001 ? "true" : "false");
+              var savedFontScale = parseFloat(localStorage.getItem("xt_font_scale") || "1");
+              if (!isFinite(savedFontScale) || savedFontScale < 0.75 || savedFontScale > 2) savedFontScale = 1;
+              var fontScaleGroup = document.getElementById("settings-font-scale");
+              if (fontScaleGroup) {
+                var fontScaleBtns = fontScaleGroup.querySelectorAll(".font-scale-btn");
+                for (var i = 0; i < fontScaleBtns.length; i++) {
+                  var btnScale = parseFloat(fontScaleBtns[i].getAttribute("data-scale") || "1");
+                  fontScaleBtns[i].setAttribute("aria-pressed", Math.abs(btnScale - savedFontScale) < 0.001 ? "true" : "false");
+                }
+              }
+              var currentTheme = localStorage.getItem("xt_theme") || "dark";
+              var themeGroup = document.getElementById("settings-theme");
+              if (themeGroup) {
+                var themeBtns = themeGroup.querySelectorAll(".theme-btn");
+                for (var j = 0; j < themeBtns.length; j++) {
+                  themeBtns[j].setAttribute("aria-pressed", themeBtns[j].getAttribute("data-theme") === currentTheme ? "true" : "false");
                 }
               }
             } catch (e) {}
           </script>
+        </article>
+
+        <!-- Live TV layout: EPG default + channel column width -->
+        <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+          <div class="flex flex-col gap-1">
+            <h3 class="text-base font-semibold">Live TV layout</h3>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Defaults for the channel sidebar and the EPG panel on Live TV. The EPG button on the page itself still toggles per session.
+            </p>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-eyebrow font-medium uppercase text-fg-3">Show EPG by default</span>
+            <div
+              id="settings-epg-default"
+              class="flex flex-wrap gap-2"
+              role="radiogroup"
+              aria-label="Show EPG by default">
+              <button type="button" data-epg="on"  aria-pressed="false" class="epg-default-btn btn">On</button>
+              <button type="button" data-epg="off" aria-pressed="false" class="epg-default-btn btn">Off</button>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <span class="text-eyebrow font-medium uppercase text-fg-3">Channel column width</span>
+            <div
+              id="settings-channel-width"
+              class="flex flex-wrap gap-2"
+              role="radiogroup"
+              aria-label="Channel column width">
+              <button type="button" data-width="22" aria-pressed="false" class="channel-width-btn btn">Compact</button>
+              <button type="button" data-width="28" aria-pressed="false" class="channel-width-btn btn">Default</button>
+              <button type="button" data-width="34" aria-pressed="false" class="channel-width-btn btn">Wide</button>
+              <button type="button" data-width="42" aria-pressed="false" class="channel-width-btn btn">X-Wide</button>
+            </div>
+          </div>
         </article>
 
         <!-- Network: User-Agent spoofing -->
@@ -138,18 +207,24 @@ import {
 
     <!-- Group: Data -->
     <section class="flex flex-col gap-3">
-      <h2 class="text-eyebrow font-semibold uppercase tracking-wide text-fg-3">Data</h2>
+      <h2 class="text-xs font-semibold uppercase tracking-widest text-fg-2">Data</h2>
       <div class="flex flex-col gap-4">
 
-        <!-- Downloads -->
-        <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+        <!-- Downloads (folder only - queue lives on /downloads) -->
+        <article id="downloads-folder-section" class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-3 scroll-mt-6">
           <div class="flex items-start justify-between gap-3">
-            <h3 class="text-base font-semibold">Downloads</h3>
+            <div class="flex flex-col gap-1 min-w-0">
+              <h3 class="text-base font-semibold">Downloads</h3>
+              <p class="text-xs text-fg-3 max-w-prose">
+                Folder where new downloads land. Manage the queue itself on the
+                <a href="/downloads" class="text-accent underline">Downloads page</a>.
+              </p>
+            </div>
             <span id="downloads-availability" class="text-xs text-fg-3 shrink-0 truncate empty:hidden"></span>
           </div>
           <div class="flex flex-col gap-1.5">
             <label class="text-eyebrow font-medium uppercase text-fg-3" for="download-dir-input">
-              Download folder
+              Save to
             </label>
             <div class="flex gap-2 flex-wrap">
               <input
@@ -170,18 +245,24 @@ import {
             </div>
           </div>
 
-          <div class="flex flex-col gap-2">
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-eyebrow font-medium uppercase text-fg-3">Active &amp; recent</span>
-              <button
-                id="downloads-clear-finished"
-                type="button"
-                class="text-xs text-fg-3 hover:text-fg focus-visible:text-fg transition-colors rounded-md px-1.5 py-0.5">
-                Clear finished
-              </button>
-            </div>
-            <div id="downloads-list" class="flex flex-col divide-y divide-line rounded-xl border border-line bg-bg overflow-hidden">
-              <div class="px-3 py-3 text-xs text-fg-3">Open a movie and tap Download to queue it here.</div>
+          <div class="flex flex-col gap-1.5">
+            <span class="text-eyebrow font-medium uppercase text-fg-3">
+              Concurrent downloads
+            </span>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Most Xtream providers cap connections per account, so a second
+              parallel download fails mid-stream. Keep this at 1 unless your
+              provider explicitly allows multiple slots.
+            </p>
+            <div
+              id="settings-download-concurrency"
+              class="flex flex-wrap gap-2"
+              role="radiogroup"
+              aria-label="Concurrent downloads">
+              <button type="button" data-concurrency="1" aria-pressed="false" class="dl-concurrency-btn btn">1</button>
+              <button type="button" data-concurrency="2" aria-pressed="false" class="dl-concurrency-btn btn">2</button>
+              <button type="button" data-concurrency="3" aria-pressed="false" class="dl-concurrency-btn btn">3</button>
+              <button type="button" data-concurrency="4" aria-pressed="false" class="dl-concurrency-btn btn">4</button>
             </div>
           </div>
         </article>
@@ -221,7 +302,7 @@ import {
 
     <!-- Group: About (App update + version + expiration) -->
     <section class="flex flex-col gap-3">
-      <h2 class="text-eyebrow font-semibold uppercase tracking-wide text-fg-3">About</h2>
+      <h2 class="text-xs font-semibold uppercase tracking-widest text-fg-2">About</h2>
       <article
         id="update-section"
         data-state="idle"
@@ -251,7 +332,7 @@ import {
           </div>
           <div class="flex flex-col gap-0.5 min-w-0 col-span-2 sm:col-span-1">
             <dt class="text-fg-3 text-eyebrow font-medium uppercase">Account expires</dt>
-            <dd id="account-expiration" class="text-fg tabular-nums truncate">-</dd>
+            <dd data-account-expiration="raw" class="text-fg tabular-nums truncate">-</dd>
           </div>
         </dl>
 
@@ -271,7 +352,7 @@ import {
           </button>
           <button id="update-install" type="button" hidden class="btn">
             <IconCloudDownload aria-hidden="true" class="btn-icon" />
-            Download &amp; install
+            <span id="update-install-label">Download &amp; install</span>
           </button>
           <button id="update-relaunch" type="button" hidden class="btn">
             Restart now
@@ -299,7 +380,7 @@ import {
 
     <!-- Group: Danger zone (always last) -->
     <section class="flex flex-col gap-3 pt-2">
-      <h2 class="text-eyebrow font-semibold uppercase tracking-wide text-bad/80">Danger zone</h2>
+      <h2 class="text-xs font-semibold uppercase tracking-widest text-bad">Danger zone</h2>
       <article class="rounded-2xl border border-bad/30 bg-bad/[0.03] p-5 sm:p-6 flex flex-col gap-4">
         <div class="flex items-start gap-3">
           <span class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-bad/10 ring-1 ring-bad/30">
@@ -325,6 +406,7 @@ import {
       </article>
     </section>
 
+    </div>
   </main>
 
   <!-- Reset confirmation dialog -->
@@ -381,50 +463,19 @@ import {
       PLAYLIST_LIST_EMPTY_COPY,
     } from "@/scripts/lib/playlist-rows.js"
     import { injectVersion } from "@/scripts/version.js"
-    import { injectExpirationDate } from "@/scripts/expiration.js"
+    import { attachDialogSpatialNav } from "@/scripts/lib/dialog-spatial-nav.js"
     import {
       UA_PRESETS,
       getUserAgent,
       setUserAgent,
       getDownloadDir,
       setDownloadDir,
+      getDownloadConcurrency,
+      setDownloadConcurrency,
     } from "@/scripts/lib/app-settings.js"
-    import {
-      listDownloads,
-      isDownloadable,
-      cancelDownload,
-      pauseDownload,
-      resumeDownload,
-      removeDownload,
-      clearFinishedDownloads,
-      DOWNLOADS_LIST_EVENT,
-      DOWNLOAD_PROGRESS_EVENT,
-    } from "@/scripts/lib/downloads.js"
+    import { isDownloadable } from "@/scripts/lib/downloads.js"
 
     injectVersion()
-    // injectExpirationDate writes "Account expires: <date>" because other
-    // pages render that string standalone in the corner. This page already
-    // labels the cell, so strip the prefix once injection completes.
-    const expirationPromise = injectExpirationDate()
-    if (expirationPromise && typeof expirationPromise.finally === "function") {
-      expirationPromise.finally(stripExpirationPrefix)
-    }
-    const expirationEl = document.getElementById("account-expiration")
-    if (expirationEl) {
-      const observer = new MutationObserver(stripExpirationPrefix)
-      observer.observe(expirationEl, { childList: true, characterData: true, subtree: true })
-    }
-    function stripExpirationPrefix() {
-      const el = document.getElementById("account-expiration")
-      if (!el) return
-      const txt = (el.textContent || "").trim()
-      const stripped = txt.replace(/^Account expires:\s*/i, "")
-      if (!txt) {
-        if (el.textContent !== "-") el.textContent = "-"
-      } else if (stripped !== txt) {
-        el.textContent = stripped || "-"
-      }
-    }
 
     const playlistsEl = document.getElementById("settings-playlists")
     const refreshBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("settings-refresh-active"))
@@ -435,6 +486,7 @@ import {
     const resetBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("settings-reset-all"))
     const resetMsgEl = document.getElementById("settings-reset-msg")
     const resetDialog = /** @type {HTMLDialogElement|null} */ (document.getElementById("settings-reset-dialog"))
+    if (resetDialog) attachDialogSpatialNav(resetDialog, { defaultElement: "#settings-reset-cancel" })
     const resetCancelBtn = document.getElementById("settings-reset-cancel")
     const resetConfirmBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("settings-reset-confirm"))
 
@@ -609,6 +661,14 @@ import {
             toRemove.push(k)
         }
         for (const k of toRemove) localStorage.removeItem(k)
+        try {
+          const sessRemove = []
+          for (let i = 0; i < sessionStorage.length; i++) {
+            const k = sessionStorage.key(i)
+            if (k && k.startsWith("xt_cache:")) sessRemove.push(k)
+          }
+          for (const k of sessRemove) sessionStorage.removeItem(k)
+        } catch {}
         removed = toRemove.length
         ok = true
         flashMsg(
@@ -737,6 +797,113 @@ import {
     syncFontScaleButtons()
 
     // ---------------------------------------------------------------------
+    // Theme: light / dark / system. Persisted to xt_theme; applied by the
+    // inline script in <head> on page load. CSS uses `light-dark()` so the
+    // single `colorScheme` property on :root drives the whole palette.
+    // ---------------------------------------------------------------------
+    const themeGroup = document.getElementById("settings-theme")
+    function readTheme() {
+      try {
+        return localStorage.getItem("xt_theme") || "dark"
+      } catch {
+        return "dark"
+      }
+    }
+    function applyTheme(t) {
+      if (t === "light") document.documentElement.style.colorScheme = "light"
+      else if (t === "dark") document.documentElement.style.colorScheme = "dark"
+      else document.documentElement.style.colorScheme = ""
+      try {
+        localStorage.setItem("xt_theme", t)
+      } catch {}
+      syncThemeButtons()
+    }
+    function syncThemeButtons() {
+      const current = readTheme()
+      for (const btn of themeGroup?.querySelectorAll(".theme-btn") || []) {
+        btn.setAttribute("aria-pressed", String(btn.dataset.theme === current))
+      }
+    }
+    themeGroup?.addEventListener("click", (e) => {
+      const t = /** @type {HTMLElement} */ (e.target)
+      const btn = t.closest(".theme-btn")
+      if (!btn) return
+      applyTheme(btn.dataset.theme || "system")
+    })
+    syncThemeButtons()
+
+    // ---------------------------------------------------------------------
+    // Live TV layout: default EPG visibility + channel column width.
+    // ---------------------------------------------------------------------
+    const epgDefaultGroup = document.getElementById("settings-epg-default")
+    function readEpgDefault() {
+      try {
+        const v = localStorage.getItem("xt_epg_open_default")
+        return v === null ? true : v === "true"
+      } catch {
+        return true
+      }
+    }
+    function applyEpgDefault(on) {
+      try {
+        localStorage.setItem("xt_epg_open_default", String(on))
+        // Reset the per-session override so the new default applies on the
+        // next visit to /livetv.
+        localStorage.removeItem("xt_epg_visible")
+      } catch {}
+      syncEpgDefaultButtons()
+    }
+    function syncEpgDefaultButtons() {
+      const on = readEpgDefault()
+      for (const btn of epgDefaultGroup?.querySelectorAll(".epg-default-btn") ||
+        []) {
+        const isOn = btn.dataset.epg === "on"
+        btn.setAttribute("aria-pressed", String(isOn === on))
+      }
+    }
+    epgDefaultGroup?.addEventListener("click", (e) => {
+      const t = /** @type {HTMLElement} */ (e.target)
+      const btn = t.closest(".epg-default-btn")
+      if (!btn) return
+      applyEpgDefault(btn.dataset.epg === "on")
+    })
+    syncEpgDefaultButtons()
+
+    const channelWidthGroup = document.getElementById("settings-channel-width")
+    const CHANNEL_WIDTH_DEFAULT = 28
+    function readChannelWidth() {
+      const raw = parseFloat(localStorage.getItem("xt_channels_w") || "")
+      return Number.isFinite(raw) && raw >= 18 && raw <= 60
+        ? raw
+        : CHANNEL_WIDTH_DEFAULT
+    }
+    function applyChannelWidth(rem) {
+      document.documentElement.style.setProperty("--xt-channels-w", `${rem}rem`)
+      try {
+        if (rem === CHANNEL_WIDTH_DEFAULT) localStorage.removeItem("xt_channels_w")
+        else localStorage.setItem("xt_channels_w", String(rem))
+      } catch {}
+      syncChannelWidthButtons()
+    }
+    function syncChannelWidthButtons() {
+      const current = readChannelWidth()
+      for (const btn of channelWidthGroup?.querySelectorAll(".channel-width-btn") ||
+        []) {
+        const v = parseFloat(btn.dataset.width || "0")
+        btn.setAttribute("aria-pressed", String(Math.abs(v - current) < 0.001))
+      }
+    }
+    channelWidthGroup?.addEventListener("click", (e) => {
+      const t = /** @type {HTMLElement} */ (e.target)
+      const btn = t.closest(".channel-width-btn")
+      if (!btn) return
+      const v = parseFloat(btn.dataset.width || "0")
+      if (!Number.isFinite(v) || v <= 0) return
+      applyChannelWidth(v)
+    })
+    syncChannelWidthButtons()
+
+    // ---------------------------------------------------------------------
     // Network / User-Agent
     // ---------------------------------------------------------------------
     const uaPresetEl = /** @type {HTMLSelectElement|null} */ (
@@ -794,7 +961,7 @@ import {
     })
 
     // ---------------------------------------------------------------------
-    // Downloads
+    // Downloads folder
     // ---------------------------------------------------------------------
     const dirInput = /** @type {HTMLInputElement|null} */ (
       document.getElementById("download-dir-input")
@@ -805,22 +972,48 @@ import {
     const dirClearBtn = /** @type {HTMLButtonElement|null} */ (
       document.getElementById("download-dir-clear")
     )
-    const downloadsListEl = document.getElementById("downloads-list")
-    const downloadsClearBtn = document.getElementById("downloads-clear-finished")
     const downloadsAvailEl = document.getElementById("downloads-availability")
+
+    const isAndroid = /Android/i.test(navigator.userAgent || "")
+
+    function prettifyAndroidUri(stored) {
+      if (!stored) return ""
+      let raw = stored
+      try {
+        const parsed = JSON.parse(stored)
+        if (parsed && typeof parsed.uri === "string") raw = parsed.uri
+      } catch {}
+      try {
+        const u = decodeURIComponent(raw)
+        const m = u.match(/document\/(?:tree\/)?([^/]+)$/) ||
+                  u.match(/tree\/([^/]+)$/)
+        if (m && m[1]) return m[1].replace(/^primary:/, "")
+        return u
+      } catch {
+        return raw
+      }
+    }
 
     function syncDir() {
       if (!dirInput) return
-      const v = getDownloadDir() || ""
-      dirInput.value = v
+      let v = getDownloadDir() || ""
+      if (isAndroid && v === "[object Object]") {
+        setDownloadDir("")
+        v = ""
+      }
+      if (isAndroid) {
+        dirInput.value = v
+          ? prettifyAndroidUri(v)
+          : "/Download/Extreme InfiniTV/ (default)"
+      } else {
+        dirInput.value = v
+      }
       if (dirClearBtn) dirClearBtn.disabled = !v
     }
     syncDir()
 
     if (downloadsAvailEl) {
-      downloadsAvailEl.textContent = isDownloadable()
-        ? ""
-        : "Desktop only"
+      downloadsAvailEl.textContent = isDownloadable() ? "" : "Desktop only"
     }
     if (!isDownloadable()) {
       if (dirPickBtn) dirPickBtn.disabled = true
@@ -831,14 +1024,25 @@ import {
       if (!isDownloadable() || !dirPickBtn) return
       setLoading(dirPickBtn, true)
       try {
-        const { open } = await import("@tauri-apps/plugin-dialog")
-        const picked = await open({
-          directory: true,
-          title: "Choose download folder",
-        })
-        if (typeof picked === "string" && picked) {
-          setDownloadDir(picked)
-          syncDir()
+        if (isAndroid) {
+          const { pickDirectory, serializeUri } = await import(
+            "@/scripts/lib/android-fs.js"
+          )
+          const picked = await pickDirectory()
+          if (picked) {
+            setDownloadDir(serializeUri(picked))
+            syncDir()
+          }
+        } else {
+          const { open } = await import("@tauri-apps/plugin-dialog")
+          const picked = await open({
+            directory: true,
+            title: "Choose download folder",
+          })
+          if (typeof picked === "string" && picked) {
+            setDownloadDir(picked)
+            syncDir()
+          }
         }
       } catch (e) {
         console.error("Pick folder failed:", e)
@@ -847,134 +1051,39 @@ import {
       }
     })
 
-    dirClearBtn?.addEventListener("click", () => {
+    dirClearBtn?.addEventListener("click", async () => {
+      const prev = getDownloadDir()
+      if (isAndroid && prev) {
+        const { releasePickedDir, deserializeUri } = await import(
+          "@/scripts/lib/android-fs.js"
+        )
+        const uri = deserializeUri(prev)
+        if (uri) releasePickedDir(uri).catch(() => {})
+      }
       setDownloadDir("")
       syncDir()
     })
 
-    function fmtSize(n) {
-      if (!n) return "-"
-      if (n < 1024) return `${n} B`
-      if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
-      if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`
-      return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`
-    }
-
-    function statusLabel(s) {
-      switch (s) {
-        case "downloading": return "Downloading"
-        case "done":        return "Done"
-        case "error":       return "Failed"
-        case "stalled":     return "Stalled"
-        case "paused":      return "Paused"
-        case "cancelled":   return "Cancelled"
-        default:            return s || "-"
+    const concurrencyGroup = document.getElementById(
+      "settings-download-concurrency"
+    )
+    function syncConcurrencyButtons() {
+      if (!concurrencyGroup) return
+      const current = getDownloadConcurrency()
+      for (const btn of concurrencyGroup.querySelectorAll(".dl-concurrency-btn")) {
+        const v = parseInt(btn.getAttribute("data-concurrency") || "1", 10)
+        btn.setAttribute("aria-pressed", v === current ? "true" : "false")
       }
     }
-
-    function statusToneClass(s) {
-      switch (s) {
-        case "done":      return "text-ok"
-        case "error":     return "text-bad"
-        case "stalled":   return "text-warn"
-        case "paused":    return "text-fg-2"
-        case "cancelled": return "text-fg-3"
-        default:          return "text-accent"
-      }
-    }
-
-    function renderDownloads() {
-      if (!downloadsListEl) return
-      const list = listDownloads()
-      const hasFinished = list.some((d) => d.status !== "downloading")
-      if (downloadsClearBtn) {
-        /** @type {HTMLButtonElement} */ (downloadsClearBtn).disabled = !hasFinished
-        downloadsClearBtn.classList.toggle("opacity-50", !hasFinished)
-        downloadsClearBtn.classList.toggle("cursor-not-allowed", !hasFinished)
-      }
-      if (!list.length) {
-        downloadsListEl.innerHTML =
-          '<div class="px-3 py-3 text-xs text-fg-3">Open a movie and tap Download to queue it here.</div>'
-        return
-      }
-      const frag = document.createDocumentFragment()
-      for (const d of list) {
-        const row = document.createElement("div")
-        row.className = "flex items-center gap-3 px-3 py-2.5 text-sm"
-
-        const info = document.createElement("div")
-        info.className = "flex flex-col min-w-0 flex-1 gap-0.5"
-        const title = document.createElement("div")
-        title.className = "truncate text-fg"
-        title.textContent = d.title
-        const meta = document.createElement("div")
-        meta.className = "truncate text-xs tabular-nums"
-        const status = document.createElement("span")
-        status.className = `font-medium ${statusToneClass(d.status)}`
-        status.textContent = statusLabel(d.status)
-        const dot = document.createTextNode(" · ")
-        const sizeText = document.createElement("span")
-        sizeText.className = "text-fg-3"
-        const pct =
-          d.bytesTotal > 0
-            ? ` · ${Math.floor((d.bytesDone / d.bytesTotal) * 100)}%`
-            : ""
-        const sizes =
-          d.bytesTotal > 0
-            ? `${fmtSize(d.bytesDone)} / ${fmtSize(d.bytesTotal)}`
-            : fmtSize(d.bytesDone)
-        sizeText.textContent = `${sizes}${pct}`
-        meta.append(status, dot, sizeText)
-        info.append(title, meta)
-
-        const actions = document.createElement("div")
-        actions.className = "shrink-0 flex items-center gap-1"
-
-        const mkAction = (label, ariaLabel, onClick, tone = "neutral") => {
-          const b = document.createElement("button")
-          b.type = "button"
-          const toneClass =
-            tone === "primary"
-              ? "text-accent hover:text-accent hover:bg-accent-soft focus-visible:bg-accent-soft"
-              : "text-fg-3 hover:text-fg hover:bg-surface-2 focus-visible:text-fg focus-visible:bg-surface-2"
-          b.className = `rounded-md px-2 py-1.5 text-xs transition-colors ${toneClass}`
-          b.textContent = label
-          b.setAttribute("aria-label", ariaLabel)
-          b.addEventListener("click", onClick)
-          return b
-        }
-
-        if (d.status === "downloading") {
-          actions.append(
-            mkAction("Pause", `Pause ${d.title}`, () => pauseDownload(d.id))
-          )
-        } else if (d.status === "stalled" || d.status === "paused" || d.status === "error") {
-          actions.append(
-            mkAction("Resume", `Resume ${d.title}`, () => resumeDownload(d.id), "primary"),
-            mkAction("Remove", `Remove ${d.title}`, () => {
-              if (confirm(`Remove "${d.title}"? The partial file will also be deleted.`)) {
-                removeDownload(d.id)
-              }
-            })
-          )
-        } else {
-          actions.append(
-            mkAction("Remove", `Remove ${d.title}`, () => removeDownload(d.id))
-          )
-        }
-
-        row.append(info, actions)
-        frag.appendChild(row)
-      }
-      downloadsListEl.replaceChildren(frag)
-    }
-    renderDownloads()
-
-    document.addEventListener(DOWNLOADS_LIST_EVENT, renderDownloads)
-    document.addEventListener(DOWNLOAD_PROGRESS_EVENT, renderDownloads)
-
-    downloadsClearBtn?.addEventListener("click", () => {
-      clearFinishedDownloads()
+    syncConcurrencyButtons()
+    concurrencyGroup?.addEventListener("click", (e) => {
+      const btn = /** @type {HTMLElement} */ (e.target).closest(
+        ".dl-concurrency-btn"
+      )
+      if (!btn) return
+      const v = parseInt(btn.getAttribute("data-concurrency") || "1", 10)
+      setDownloadConcurrency(v)
+      syncConcurrencyButtons()
     })
 
     const updateSectionEl = document.getElementById("update-section")
@@ -993,6 +1102,7 @@ import {
     const updateInstallBtn = /** @type {HTMLButtonElement|null} */ (
       document.getElementById("update-install")
     )
+    const updateInstallLabelEl = document.getElementById("update-install-label")
     const updateRelaunchBtn = /** @type {HTMLButtonElement|null} */ (
       document.getElementById("update-relaunch")
     )
@@ -1064,6 +1174,10 @@ import {
       return `${(n / (1024 * 1024)).toFixed(1)} MB`
     }
 
+    function setInstallLabel(text) {
+      if (updateInstallLabelEl) updateInstallLabelEl.textContent = text
+    }
+
     async function checkForUpdates() {
       if (!isWindowsDesktop) return
       if (updateMsgEl) updateMsgEl.textContent = "Checking…"
@@ -1071,6 +1185,8 @@ import {
       updateCheckBtn?.setAttribute("disabled", "")
       updateInstallBtn?.setAttribute("hidden", "")
       updateRelaunchBtn?.setAttribute("hidden", "")
+      setInstallLabel("Download & install")
+      setProgress(null)
       try {
         const { check } = await import("@tauri-apps/plugin-updater")
         const update = await check()
@@ -1149,13 +1265,17 @@ import {
         if (updateMsgEl) {
           updateMsgEl.textContent = "Update installed. Restart to apply."
         }
+        setInstallLabel("Download & install")
         updateRelaunchBtn?.removeAttribute("hidden")
       } catch (e) {
         console.error("Update install failed:", e)
         if (updateMsgEl) {
-          updateMsgEl.textContent = `Install failed - ${String(e?.message || e)}`
+          updateMsgEl.textContent =
+            `Download failed - ${String(e?.message || e)}. ` +
+            "Click Re-download to start over."
         }
         setProgress(null)
+        setInstallLabel("Re-download")
         updateInstallBtn?.removeAttribute("disabled")
       } finally {
         updateCheckBtn?.removeAttribute("disabled")

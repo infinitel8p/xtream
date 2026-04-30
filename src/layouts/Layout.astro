@@ -24,25 +24,31 @@ const documentTitle = pageTitle
     <meta name="theme-color" content="#0e1628" media="(prefers-color-scheme: dark)" />
     <script is:inline>
       try {
-        var s = parseFloat(localStorage.getItem("xt_font_scale") || "1");
-        if (!isFinite(s) || s < 0.75 || s > 2) s = 1;
-        document.documentElement.style.setProperty("--xt-font-scale", String(s));
+        var fontScale = parseFloat(localStorage.getItem("xt_font_scale") || "1");
+        if (!isFinite(fontScale) || fontScale < 0.75 || fontScale > 2) fontScale = 1;
+        document.documentElement.style.setProperty("--xt-font-scale", String(fontScale));
+        var cw = parseFloat(localStorage.getItem("xt_channels_w") || "");
+        if (isFinite(cw) && cw >= 18 && cw <= 60) {
+          document.documentElement.style.setProperty("--xt-channels-w", cw + "rem");
+        }
+
+        var currentTheme = localStorage.getItem("xt_theme") || "dark";
+        if (currentTheme === "light") document.documentElement.style.colorScheme = "light";
+        else if (currentTheme === "dark") document.documentElement.style.colorScheme = "dark";
       } catch (e) {}
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap"
-      rel="stylesheet"
-    />
   </head>
 
   <body
-    class="antialiased bg-bg text-fg selection:bg-accent-soft min-h-screen
-           flex flex-col md:flex-row pr-[env(safe-area-inset-right)]"
+    class="antialiased bg-bg text-fg selection:bg-accent-soft min-h-dvh
+           flex flex-col md:flex-row landscape-phone:flex-row
+           landscape-phone:h-dvh landscape-phone:min-h-0 landscape-phone:overflow-hidden
+           pt-[env(safe-area-inset-top)]
+           pr-[env(safe-area-inset-right)]"
   >
     <Sidebar />
-    <div class="flex-1 min-w-0 min-h-0 flex flex-col order-first md:order-none">
+    <div class="flex-1 min-w-0 min-h-0 flex flex-col order-first md:order-0
+                landscape-phone:overflow-y-auto">
       <slot />
     </div>
   </body>
@@ -82,16 +88,37 @@ const documentTitle = pageTitle
     "color: oklch(0.6 0.011 250); font: 0.75rem/1.4 ui-sans-serif, system-ui;"
   )
 
+  import("@/scripts/expiration.js").then((m) => m.injectExpirationDate?.())
+  document.addEventListener("xt:active-changed", () => {
+    import("@/scripts/expiration.js").then((m) => m.injectExpirationDate?.())
+  })
+
   window.addEventListener("load", function () {
     SpatialNavigation.init()
 
     SpatialNavigation.add({
+      id: "main",
       selector:
         "a, button, summary, input, textarea, [contenteditable='true'], select, [tabindex]:not([tabindex='-1'])",
     })
 
     SpatialNavigation.makeFocusable()
 
-    SpatialNavigation.focus()
+    const ARROWS = new Set([
+      "ArrowUp",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowRight",
+    ])
+    const onFirstArrow = (e) => {
+      if (!ARROWS.has(e.key)) return
+      const active = document.activeElement
+      if (!active || active === document.body) {
+        e.preventDefault()
+        SpatialNavigation.focus()
+      }
+      document.removeEventListener("keydown", onFirstArrow, true)
+    }
+    document.addEventListener("keydown", onFirstArrow, true)
   })
 </script>

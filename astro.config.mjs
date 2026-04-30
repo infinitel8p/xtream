@@ -4,9 +4,6 @@ import tailwindcss from "@tailwindcss/vite"
 import { optimizeTablerIconsImport } from "./src/plugins/vite-plugin-optimize-tabler-icons.ts"
 import svelte from "@astrojs/svelte"
 
-// Optionally pin HMR to a specific LAN host (useful for testing the dev server
-// from a phone / TV on the same network). Set XTREAM_HMR_HOST=192.168.x.y in
-// .env or your shell to enable; otherwise Vite picks the right host itself.
 const hmrHost = process.env.XTREAM_HMR_HOST
 
 export default defineConfig({
@@ -20,15 +17,7 @@ export default defineConfig({
         : undefined,
     },
     build: {
-      rollupOptions: {
-        external: [
-          "@tauri-apps/plugin-process",
-          "@tauri-apps/plugin-updater",
-          "@tauri-apps/plugin-http",
-          "@tauri-apps/plugin-fs",
-          "@tauri-apps/plugin-dialog",
-        ],
-      },
+      chunkSizeWarningLimit: 800,
     },
     optimizeDeps: {
       include: [
@@ -38,6 +27,7 @@ export default defineConfig({
         "@tauri-apps/plugin-http",
         "@tauri-apps/plugin-fs",
         "@tauri-apps/plugin-dialog",
+        "tauri-plugin-android-fs-api",
       ],
     },
   },

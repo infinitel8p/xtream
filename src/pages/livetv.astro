@@ -1,7 +1,7 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import SearchInput from "@/components/SearchInput.astro";
-import { IconDeviceTv, IconChevronDown, IconCalendarTime } from "@tabler/icons-svelte";
+import { IconDeviceTv, IconChevronDown, IconCalendarTime, IconLayoutGrid } from "@tabler/icons-svelte";
 ---
 
 <Layout pageTitle="Live TV">
@@ -15,7 +15,7 @@ import { IconDeviceTv, IconChevronDown, IconCalendarTime } from "@tabler/icons-s
 			<!-- Channels (bottom on mobile, left column on desktop) -->
 			<aside
 				class="order-2 md:landscape:order-1 lg:order-1
-					md:landscape:w-96 lg:w-[28rem]
+					md:landscape:w-[var(--xt-channels-w,24rem)] lg:w-[var(--xt-channels-w,28rem)]
 					md:landscape:shrink-0 lg:shrink-0 min-h-0">
 				<div
 					class="rounded-2xl border border-line bg-surface p-3 h-full flex flex-col gap-3 min-h-0">
@@ -26,7 +26,7 @@ import { IconDeviceTv, IconChevronDown, IconCalendarTime } from "@tabler/icons-s
 							type="button"
 							aria-haspopup="dialog"
 							aria-controls="category-picker-dialog"
-							class="rounded-xl border border-line bg-bg px-3 py-2 text-sm flex items-center gap-2 text-left flex-1 min-w-0
+							class="rounded-xl border border-line bg-bg px-3.5 py-2 min-h-11 text-sm flex items-center gap-2 text-left flex-1 min-w-0
 								hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent
 								transition-colors">
 							<span class="text-fg-3 shrink-0">Category</span>
@@ -39,11 +39,15 @@ import { IconDeviceTv, IconChevronDown, IconCalendarTime } from "@tabler/icons-s
 								class="size-4 text-fg-3 shrink-0"
 							/>
 						</button>
-						<a
-							href="/epg"
-							aria-label="Open EPG schedule grid"
-							class="rounded-xl border border-line bg-bg px-3 py-2 text-sm text-fg-2 inline-flex items-center gap-2 shrink-0
+						<button
+							id="epg-toggle"
+							type="button"
+							aria-pressed="true"
+							aria-label="Show EPG for the current channel"
+							title="Show EPG"
+							class="rounded-xl border border-line bg-bg px-3.5 py-2 min-h-11 min-w-11 text-sm text-fg-2 inline-flex items-center justify-center gap-2 shrink-0
 								hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent
+								aria-pressed:border-accent aria-pressed:bg-surface-2 aria-pressed:text-fg
 								transition-colors">
 							<IconCalendarTime
 								aria-hidden="true"
@@ -51,6 +55,20 @@ import { IconDeviceTv, IconChevronDown, IconCalendarTime } from "@tabler/icons-s
 								class="size-4"
 							/>
 							<span class="hidden sm:inline">EPG</span>
+						</button>
+						<a
+							href="/epg"
+							aria-label="Open the full EPG schedule grid"
+							title="Open schedule grid"
+							class="rounded-xl border border-line bg-bg px-3.5 py-2 min-h-11 min-w-11 text-sm text-fg-2 inline-flex items-center justify-center shrink-0
+								hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent
+								transition-colors">
+							<IconLayoutGrid
+								aria-hidden="true"
+								stroke={2}
+								class="size-4"
+							/>
+							<span class="sr-only">Schedule grid</span>
 						</a>
 					</div>
 
@@ -88,18 +106,21 @@ import { IconDeviceTv, IconChevronDown, IconCalendarTime } from "@tabler/icons-s
 						style="max-height: 60dvh; max-width: calc(60dvh * 16 / 9);">
 						<div
 							id="player-empty"
-							class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-6 pointer-events-none">
+							class="absolute inset-0 flex flex-col items-center justify-center gap-5 text-center px-6 pointer-events-none">
 							<IconDeviceTv
 								aria-hidden="true"
-								stroke={1}
-								class="size-14 sm:size-16 text-fg-3 opacity-70"
+								stroke={0.75}
+								class="size-20 sm:size-24 lg:size-28 text-fg-3/60"
 							/>
-							<p class="text-fg-2 text-sm sm:text-base">
-								Pick a channel to start watching
-							</p>
-							<p class="text-fg-3 text-xs">
-								Press the channels list, or change category from the picker.
-							</p>
+							<div class="flex flex-col gap-2">
+								<p class="text-fg leading-tight tracking-[-0.02em] font-semibold"
+									style="font-size: clamp(1.25rem, 2vw + 0.75rem, 2.25rem);">
+									Pick a channel.
+								</p>
+								<p class="text-fg-3 text-xs sm:text-sm">
+									Choose from the list, or change category.
+								</p>
+							</div>
 						</div>
 						<video
 							id="player"
@@ -177,25 +198,20 @@ import { IconDeviceTv, IconChevronDown, IconCalendarTime } from "@tabler/icons-s
 			class="fixed bottom-[max(0.5rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))] text-2xs text-fg-3 opacity-70 tabular-nums pointer-events-none">
 			Loading…
 		</div>
-		<div
-			id="account-expiration"
-			class="fixed bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] text-2xs text-fg-3 opacity-70 tabular-nums pointer-events-none">
-			Loading…
-		</div>
 	</main>
 
 	<script>
 		import "../scripts/stream/stream.js";
 		import "../scripts/updater-startup.js";
 		import { injectVersion } from "../scripts/version.js";
-		import { injectExpirationDate } from "../scripts/expiration.js";
+		import { attachDialogSpatialNav } from "../scripts/lib/dialog-spatial-nav.js";
 		injectVersion();
-		injectExpirationDate();
 
 		const trigger = document.getElementById("category-picker-trigger");
 		const dlg = /** @type {HTMLDialogElement|null} */ (
 			document.getElementById("category-picker-dialog")
 		);
+		if (dlg) attachDialogSpatialNav(dlg, { defaultElement: "#category-search" });
 		const closeBtn = document.getElementById("category-picker-close");
 		const labelEl = document.getElementById("category-picker-label");
 		const categoryList = document.getElementById("category-list");
@@ -214,7 +230,9 @@ import { IconDeviceTv, IconChevronDown, IconCalendarTime } from "@tabler/icons-s
 		const syncLabel = () => {
 			if (!labelEl) return;
 			const cat = readActive();
-			labelEl.textContent = cat || "All categories";
+			if (cat === "__favorites__") labelEl.textContent = "★ Favorites";
+			else if (cat === "__recents__") labelEl.textContent = "🕒 Recently watched";
+			else labelEl.textContent = cat || "All categories";
 		};
 
 		trigger?.addEventListener("click", () => {
@@ -261,6 +279,47 @@ import { IconDeviceTv, IconChevronDown, IconCalendarTime } from "@tabler/icons-s
 			new MutationObserver(sync).observe(playerEl, {
 				attributes: true,
 				attributeFilter: ["hidden"],
+			});
+		}
+
+		const epgToggle = /** @type {HTMLButtonElement|null} */ (
+			document.getElementById("epg-toggle")
+		);
+		const epgPanel = document.getElementById("epg");
+		if (epgToggle && epgPanel) {
+			const KEY_VISIBLE = "xt_epg_visible";
+			const KEY_DEFAULT = "xt_epg_open_default";
+
+			const readDefault = () => {
+				try {
+					const v = localStorage.getItem(KEY_DEFAULT);
+					return v === null ? true : v === "true";
+				} catch {
+					return true;
+				}
+			};
+			const readVisible = () => {
+				try {
+					const v = localStorage.getItem(KEY_VISIBLE);
+					return v === null ? readDefault() : v === "true";
+				} catch {
+					return true;
+				}
+			};
+
+			const apply = (visible) => {
+				epgPanel.classList.toggle("hidden", !visible);
+				epgToggle.setAttribute("aria-pressed", String(visible));
+			};
+
+			apply(readVisible());
+
+			epgToggle.addEventListener("click", () => {
+				const next = epgToggle.getAttribute("aria-pressed") !== "true";
+				try {
+					localStorage.setItem(KEY_VISIBLE, String(next));
+				} catch {}
+				apply(next);
 			});
 		}
 	</script>

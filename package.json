@@ -1,7 +1,7 @@
 {
   "name": "xtream",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "packageManager": "pnpm@10.31.0",
   "scripts": {
     "dev": "astro dev --host",
@@ -18,6 +18,8 @@
   "dependencies": {
     "@astrojs/netlify": "^7.0.8",
     "@astrojs/svelte": "^8.0.5",
+    "@fontsource-variable/geist": "5.2.8",
+    "@fontsource/instrument-serif": "5.2.8",
     "@tabler/icons-svelte": "^3.41.1",
     "@tailwindcss/vite": "^4.2.4",
     "@tauri-apps/api": "^2.10.1",
@@ -30,6 +32,7 @@
     "astro": "^6.1.9",
     "svelte": "^5.55.5",
     "tailwindcss": "^4.2.4",
+    "tauri-plugin-android-fs-api": "28.1.0",
     "typescript": "^6.0.3",
     "video.js": "^8.23.7"
   },

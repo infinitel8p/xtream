@@ -1,7 +1,7 @@
+// Series listing page (route: /series).
 import {
   loadCreds,
   getActiveEntry,
-  fmtBase,
   buildApiUrl,
   normalize,
   debounce,
@@ -12,10 +12,10 @@ import {
   isFavorite,
   toggleFavorite,
   getFavorites,
-  pushRecent,
   getRecents,
 } from "@/scripts/lib/preferences.js"
 import { providerFetch } from "@/scripts/lib/provider-fetch.js"
+import { renderProviderError } from "@/scripts/lib/provider-error.js"
 
 const SERIES_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -29,7 +29,6 @@ function fmtAge(ms) {
   return `${d}d ago`
 }
 
-/** @type {{host:string,port:string,user:string,pass:string}} */
 let creds = { host: "", port: "", user: "", pass: "" }
 
 // ----------------------------
@@ -48,27 +47,10 @@ const searchEl = /** @type {HTMLInputElement|null} */ (
   document.getElementById("series-search")
 )
 
-// Detail dialog refs
-const detailDlg = /** @type {HTMLDialogElement|null} */ (
-  document.getElementById("series-detail-dialog")
-)
-const detailTitle = document.getElementById("series-detail-title")
-const detailPoster = document.getElementById("series-detail-poster")
-const detailMeta = document.getElementById("series-detail-meta")
-const detailPlot = document.getElementById("series-detail-plot")
-const detailFav = document.getElementById("series-detail-fav")
-const detailClose = document.getElementById("series-detail-close")
-const detailPlayerWrap = document.getElementById("series-detail-player-wrap")
-const seasonTabs = document.getElementById("series-season-tabs")
-const episodeList = document.getElementById("series-episode-list")
-const nowPlayingLabel = document.getElementById("series-now-playing")
-
 // ----------------------------
 // State
 // ----------------------------
-/** @type {Array<{id:number,name:string,category?:string,logo?:string|null,year?:string,rating?:string,plot?:string,norm:string}>} */
 let all = []
-/** @type {typeof all} */
 let filtered = []
 
 /** @type {Map<string,string> | null} */
@@ -80,6 +62,7 @@ try {
 } catch {}
 
 let activePlaylistId = ""
+let activePlaylistTitle = ""
 
 const hiddenCats = new Set()
 
@@ -98,7 +81,6 @@ document.addEventListener("xt:favorites-changed", (e) => {
   if (activeCat === CAT_FAVORITES) applyFilter()
   else updateGridStarFor(detail.id)
   syncPseudoCategoryRows()
-  if (currentDetailSeries?.id === detail.id) syncDetailFavButton()
 })
 
 document.addEventListener("xt:recents-changed", (e) => {
@@ -250,7 +232,7 @@ function setActiveCat(next) {
 }
 
 // ----------------------------
-// Poster grid (paged via IntersectionObserver, see movies.js for rationale)
+// Poster grid
 // ----------------------------
 const PAGE_SIZE = 200
 let renderToken = 0
@@ -279,13 +261,18 @@ function makeCard(s, idx) {
   card.style.contentVisibility = "auto"
   card.style.containIntrinsicSize = "260px"
 
-  const playBtn = document.createElement("button")
-  playBtn.type = "button"
-  playBtn.dataset.role = "play"
-  playBtn.className =
-    "play-btn block w-full text-left outline-none cursor-pointer"
-  playBtn.title = s.name || ""
-  playBtn.addEventListener("click", () => openDetail(s))
+  const link = document.createElement("a")
+  link.href = `/series/detail?id=${encodeURIComponent(s.id)}`
+  link.dataset.role = "play"
+  link.className =
+    "play-btn block w-full text-left outline-none cursor-pointer no-underline"
+  link.title = s.name || ""
+  link.setAttribute("aria-label", `Open ${s.name || `Series ${s.id}`}`)
+
+  link.addEventListener("click", () => {
+    const img = link.querySelector("img")
+    if (img) /** @type {HTMLElement} */ (img).style.viewTransitionName = "active-poster"
+  })
 
   const posterWrap = document.createElement("div")
   posterWrap.className =
@@ -296,6 +283,7 @@ function makeCard(s, idx) {
     img.src = s.logo
     img.alt = ""
     img.loading = "lazy"
+    img.decoding = "async"
     img.referrerPolicy = "no-referrer"
     img.className =
       "h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
@@ -307,7 +295,7 @@ function makeCard(s, idx) {
   } else {
     posterWrap.appendChild(makeFallback(s.name))
   }
-  playBtn.appendChild(posterWrap)
+  link.appendChild(posterWrap)
 
   const info = document.createElement("div")
   info.className = "px-2 py-2 min-w-0"
@@ -321,9 +309,9 @@ function makeCard(s, idx) {
   if (s.category) parts.push(s.category)
   meta.textContent = parts.join(" • ")
   info.append(nameEl, meta)
-  playBtn.appendChild(info)
+  link.appendChild(info)
 
-  card.appendChild(playBtn)
+  card.appendChild(link)
 
   const fav = activePlaylistId
     ? isFavorite(activePlaylistId, "series", s.id)
@@ -493,7 +481,6 @@ function applyFilter() {
   const qnorm = normalize(searchEl?.value || "")
   const tokens = qnorm.length ? qnorm.split(" ") : []
 
-  /** @type {typeof all} */
   let out
   if (activeCat === CAT_FAVORITES && activePlaylistId) {
     const favs = getFavorites(activePlaylistId, "series")
@@ -559,10 +546,12 @@ async function loadSeries() {
   const active = await getActiveEntry()
   if (!active) {
     activePlaylistId = ""
+    activePlaylistTitle = ""
     showEmptyState()
     return
   }
   activePlaylistId = active._id
+  activePlaylistTitle = active.title || ""
   await ensurePrefsLoaded()
 
   const hit = getCached(active._id, "series")
@@ -639,386 +628,21 @@ async function loadSeries() {
     )
     paintSeries(data, fromCache, age)
   } catch (e) {
-    console.error(e)
-    listStatus.textContent =
-      "Couldn't load series - check your login or try Refresh."
+    console.error("[xt:series] loadSeries threw:", e)
     filtered = []
     renderGrid()
-  }
-}
-
-// ----------------------------
-// Detail dialog (seasons + episodes)
-// ----------------------------
-let vjs = null
-
-const ensurePlayer = async () => {
-  if (vjs) return vjs
-  const [{ default: videojs }] = await Promise.all([
-    import("video.js"),
-    import("video.js/dist/video-js.css"),
-  ])
-  vjs = videojs("series-player", {
-    liveui: false,
-    fluid: true,
-    preload: "auto",
-    autoplay: false,
-    aspectRatio: "16:9",
-    controlBar: {
-      volumePanel: { inline: false },
-      pictureInPictureToggle: true,
-      playbackRateMenuButton: true,
-      fullscreenToggle: true,
-    },
-    html5: {
-      vhs: {
-        overrideNative: true,
-        limitRenditionByPlayerDimensions: true,
-        smoothQualityChange: true,
-      },
-    },
-  })
-  return vjs
-}
-
-function fmtDuration(minsOrStr) {
-  if (!minsOrStr) return ""
-  const s = String(minsOrStr)
-  const m = parseInt(s, 10)
-  if (!isFinite(m) || m <= 0) return s
-  const h = Math.floor(m / 60)
-  const mm = m % 60
-  if (!h) return `${mm} min`
-  return `${h}h ${mm.toString().padStart(2, "0")}m`
-}
-
-function chooseMime(url) {
-  if (!url) return "video/mp4"
-  const lower = url.split("?")[0].toLowerCase()
-  if (lower.endsWith(".m3u8")) return "application/x-mpegURL"
-  if (lower.endsWith(".mpd")) return "application/dash+xml"
-  if (lower.endsWith(".webm")) return "video/webm"
-  if (lower.endsWith(".mkv")) return "video/x-matroska"
-  if (lower.endsWith(".ts")) return "video/MP2T"
-  if (lower.endsWith(".avi")) return "video/x-msvideo"
-  return "video/mp4"
-}
-
-let currentDetailSeries = null
-/** @type {Record<string, any[]>|null} seasonNumber → episode array */
-let currentDetailEpisodes = null
-let currentSeason = ""
-
-function syncDetailFavButton() {
-  if (!detailFav || !currentDetailSeries || !activePlaylistId) return
-  const fav = isFavorite(activePlaylistId, "series", currentDetailSeries.id)
-  detailFav.textContent = fav ? "Remove from favorites" : "Add to favorites"
-  detailFav.classList.toggle("text-accent", fav)
-  detailFav.setAttribute("aria-pressed", String(fav))
-}
-
-function buildEpisodeStreamUrl(episode) {
-  const rawExt = episode.container_extension || "mp4"
-  const ext = String(rawExt).replace(/^\.+/, "").toLowerCase() || "mp4"
-  return (
-    fmtBase(creds.host, creds.port) +
-    "/series/" +
-    encodeURIComponent(creds.user) +
-    "/" +
-    encodeURIComponent(creds.pass) +
-    "/" +
-    encodeURIComponent(episode.id) +
-    "." +
-    ext
-  )
-}
-
-function renderSeasonTabs(seasonKeys) {
-  if (!seasonTabs) return
-  seasonTabs.replaceChildren()
-  if (!seasonKeys.length) {
-    seasonTabs.style.display = "none"
-    return
-  }
-  seasonTabs.style.display = ""
-  for (const key of seasonKeys) {
-    const btn = document.createElement("button")
-    btn.type = "button"
-    btn.dataset.season = key
-    btn.className =
-      "rounded-lg px-3 py-1.5 text-sm border outline-none transition-colors " +
-      (key === currentSeason
-        ? "border-accent bg-accent-soft text-fg"
-        : "border-line text-fg-2 hover:bg-surface-2 hover:text-fg focus-visible:bg-surface-2 focus-visible:text-fg")
-    btn.textContent = `Season ${key}`
-    btn.addEventListener("click", () => {
-      if (currentSeason === key) return
-      currentSeason = key
-      renderSeasonTabs(seasonKeys)
-      renderEpisodes()
+    renderProviderError(listStatus, {
+      providerName: activePlaylistTitle,
+      kind: "series",
+      onRetry: loadSeries,
     })
-    seasonTabs.appendChild(btn)
   }
 }
-
-function renderEpisodes() {
-  if (!episodeList) return
-  episodeList.replaceChildren()
-  const eps = currentDetailEpisodes?.[currentSeason] || []
-  if (!eps.length) {
-    const empty = document.createElement("div")
-    empty.className = "text-fg-3 text-sm py-3"
-    empty.textContent = "No episodes in this season."
-    episodeList.appendChild(empty)
-    return
-  }
-  for (const ep of eps) {
-    const row = document.createElement("button")
-    row.type = "button"
-    row.className =
-      "episode-row flex items-center gap-3 p-3 rounded-xl bg-surface-2/40 " +
-      "text-left outline-none transition-colors " +
-      "hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:ring-2 focus-visible:ring-accent"
-    row.addEventListener("click", () => playEpisode(ep))
-
-    const num = document.createElement("div")
-    num.className =
-      "shrink-0 size-10 rounded-md bg-surface-3 flex items-center justify-center text-sm font-semibold tabular-nums text-fg-2"
-    num.textContent = `E${ep.episode_num || "?"}`
-    row.appendChild(num)
-
-    const wrap = document.createElement("div")
-    wrap.className = "min-w-0 flex-1"
-    const title = document.createElement("div")
-    title.className = "truncate text-sm font-medium text-fg"
-    title.textContent = ep.title || `Episode ${ep.episode_num || ""}`
-    wrap.appendChild(title)
-
-    const meta = document.createElement("div")
-    meta.className = "truncate text-xs text-fg-3 tabular-nums"
-    const bits = []
-    const dur = ep.info?.duration || ""
-    if (dur) bits.push(dur)
-    const released = ep.info?.release_date || ep.info?.releaseDate || ""
-    if (released) bits.push(released)
-    meta.textContent = bits.join(" • ")
-    wrap.appendChild(meta)
-
-    row.appendChild(wrap)
-
-    const arrow = document.createElement("span")
-    arrow.className = "shrink-0 text-fg-3 text-base"
-    arrow.textContent = "▶"
-    row.appendChild(arrow)
-
-    episodeList.appendChild(row)
-  }
-  try { window.SpatialNavigation?.makeFocusable?.() } catch {}
-}
-
-async function openDetail(series) {
-  if (!detailDlg || !series) return
-  currentDetailSeries = series
-  currentDetailEpisodes = null
-  currentSeason = ""
-
-  if (detailTitle) detailTitle.textContent = series.name || `Series ${series.id}`
-  if (detailMeta) detailMeta.textContent = ""
-  if (detailPlot) detailPlot.textContent = "Loading details…"
-
-  if (detailPoster) {
-    detailPoster.replaceChildren()
-    if (series.logo) {
-      const img = document.createElement("img")
-      img.src = series.logo
-      img.alt = ""
-      img.loading = "eager"
-      img.referrerPolicy = "no-referrer"
-      img.className = "h-full w-full object-cover"
-      img.onerror = () => {
-        img.remove()
-        detailPoster.appendChild(makeFallback(series.name))
-      }
-      detailPoster.appendChild(img)
-    } else {
-      detailPoster.appendChild(makeFallback(series.name))
-    }
-  }
-
-  // Reset hero state.
-  if (detailPoster) detailPoster.classList.remove("hidden")
-  if (detailPlayerWrap) detailPlayerWrap.classList.add("hidden")
-  if (nowPlayingLabel) nowPlayingLabel.textContent = ""
-  const videoEl = document.getElementById("series-player")
-  videoEl?.setAttribute("hidden", "")
-  try {
-    vjs?.pause?.()
-    vjs?.reset?.()
-  } catch {}
-
-  if (seasonTabs) seasonTabs.replaceChildren()
-  if (episodeList) {
-    episodeList.replaceChildren()
-    const loading = document.createElement("div")
-    loading.className = "text-fg-3 text-sm py-3"
-    loading.textContent = "Loading seasons…"
-    episodeList.appendChild(loading)
-  }
-
-  syncDetailFavButton()
-
-  if (typeof detailDlg.showModal === "function") detailDlg.showModal()
-  else detailDlg.setAttribute("open", "")
-
-  setTimeout(() => {
-    try { window.SpatialNavigation?.makeFocusable?.() } catch {}
-    /** @type {HTMLButtonElement|null} */ (detailFav)?.focus?.()
-  }, 0)
-
-  try {
-    // Some Xtream backends want `series_id=`, others `series=`. api.md says
-    // `series=`, but real-world providers commonly only accept `series_id=`.
-    // Send both - the server picks whichever it recognises.
-    const r = await providerFetch(
-      buildApiUrl(creds, "get_series_info", {
-        series_id: String(series.id),
-        series: String(series.id),
-      })
-    )
-    if (!r.ok) throw new Error(await r.text())
-    const data = await r.json()
-    const info = data?.info || {}
-    const seasons = Array.isArray(data?.seasons) ? data.seasons : []
-    // `episodes` is usually an object keyed by season number, but some
-    // providers return an array. Normalise to the object shape.
-    let episodesByKey = {}
-    if (data?.episodes && typeof data.episodes === "object") {
-      if (Array.isArray(data.episodes)) {
-        // Array of episodes, group by `season` field.
-        for (const ep of data.episodes) {
-          const k = String(ep?.season ?? "1")
-          ;(episodesByKey[k] = episodesByKey[k] || []).push(ep)
-        }
-      } else {
-        episodesByKey = data.episodes
-      }
-    }
-
-    if (currentDetailSeries?.id !== series.id) return // user closed/swapped
-
-    // If no episodes came back, log the raw response so it's diagnosable
-    // - this is how every "no episodes" issue gets unstuck (provider
-    // returns a different shape, or returns empty when given `series=`).
-    if (!Object.keys(episodesByKey).length) {
-      console.warn(
-        "[series] get_series_info returned no episodes for",
-        series.id,
-        data
-      )
-    }
-
-    const year = info.releaseDate || info.releasedate || info.year || series.year || ""
-    const rating = info.rating || info.rating_5based || series.rating || ""
-    const genre = info.genre || info.category || ""
-    const cast = info.cast || ""
-    const plot = info.plot || info.description || series.plot || ""
-
-    if (detailMeta) {
-      const bits = []
-      if (year) bits.push(year)
-      if (genre) bits.push(genre)
-      if (rating) bits.push(`Rating: ${String(rating).slice(0, 4)}`)
-      if (seasons.length) bits.push(`${seasons.length} season${seasons.length > 1 ? "s" : ""}`)
-      detailMeta.textContent = bits.join(" • ")
-    }
-    if (detailPlot) {
-      detailPlot.textContent = plot || (cast ? `Cast: ${cast}` : "No description available.")
-    }
-
-    currentDetailEpisodes = episodesByKey
-    const seasonKeys = Object.keys(episodesByKey).sort(
-      (a, b) => Number(a) - Number(b)
-    )
-    currentSeason = seasonKeys[0] || ""
-    renderSeasonTabs(seasonKeys)
-    renderEpisodes()
-  } catch (e) {
-    console.error(e)
-    if (detailPlot)
-      detailPlot.textContent = "Failed to load series details."
-    if (episodeList) {
-      episodeList.replaceChildren()
-      const fail = document.createElement("div")
-      fail.className = "text-bad text-sm py-3"
-      fail.textContent = "Couldn't load episodes."
-      episodeList.appendChild(fail)
-    }
-  }
-}
-
-async function playEpisode(episode) {
-  if (!currentDetailSeries || !episode) return
-  const src = buildEpisodeStreamUrl(episode)
-
-  // Recents at the SERIES level - what users want surfaced as a row, not
-  // a stream of "S2E5"-style episode-level entries that bury the show name.
-  if (activePlaylistId) {
-    pushRecent(
-      activePlaylistId,
-      "series",
-      currentDetailSeries.id,
-      currentDetailSeries.name,
-      currentDetailSeries.logo || null
-    )
-  }
-
-  if (nowPlayingLabel) {
-    nowPlayingLabel.textContent =
-      `S${episode.season || currentSeason}E${episode.episode_num || "?"} · ${episode.title || ""}`
-  }
-
-  if (detailPoster) detailPoster.classList.add("hidden")
-  if (detailPlayerWrap) detailPlayerWrap.classList.remove("hidden")
-  const videoEl = document.getElementById("series-player")
-  videoEl?.removeAttribute("hidden")
-
-  const player = await ensurePlayer()
-  player.src({ src, type: chooseMime(src) })
-  player.play().catch(() => {})
-}
-
-detailFav?.addEventListener("click", () => {
-  if (!currentDetailSeries || !activePlaylistId) return
-  toggleFavorite(activePlaylistId, "series", currentDetailSeries.id)
-})
-
-detailClose?.addEventListener("click", () => detailDlg?.close?.())
-
-detailDlg?.addEventListener("click", (e) => {
-  if (e.target === detailDlg) detailDlg.close()
-})
-
-detailDlg?.addEventListener("close", () => {
-  try {
-    vjs?.pause?.()
-    vjs?.reset?.()
-  } catch {}
-  if (detailPlayerWrap) detailPlayerWrap.classList.add("hidden")
-  if (detailPoster) detailPoster.classList.remove("hidden")
-  if (nowPlayingLabel) nowPlayingLabel.textContent = ""
-  const videoEl = document.getElementById("series-player")
-  videoEl?.setAttribute("hidden", "")
-  currentDetailSeries = null
-  currentDetailEpisodes = null
-  currentSeason = ""
-})
 
 // ----------------------------
 // Boot
 // ----------------------------
-document.addEventListener("xt:active-changed", () => {
-  loadSeries()
-})
+document.addEventListener("xt:active-changed", () => loadSeries())
 
 ;(async () => {
   creds = await loadCreds()
