@@ -24,24 +24,31 @@ async function getTauriFetch() {
 export async function providerFetch(url, init = {}) {
   const ua = getUserAgent()
   const tauriFetch = await getTauriFetch()
+  const route = tauriFetch ? "tauri" : "native"
+  const u = String(url).slice(0, 200)
+  console.log(`[xt:net] ${route} start`, u)
   if (tauriFetch) {
     const headers = new Headers(init.headers || {})
     if (ua) headers.set("User-Agent", ua)
     try {
-      return await tauriFetch(url, { ...init, headers })
+      const r = await tauriFetch(url, { ...init, headers })
+      console.log(`[xt:net] tauri ok ${r.status}`, u)
+      return r
     } catch (e) {
       const tag = init?.signal?.aborted ? "aborted" : "failed"
       if (tag !== "aborted") {
-        console.error("[xt:net] tauri fetch failed", { url, error: e })
+        console.error("[xt:net] tauri fetch failed", { url: u, error: e })
       }
       throw e
     }
   }
   try {
-    return await fetch(url, init)
+    const r = await fetch(url, init)
+    console.log(`[xt:net] native ok ${r.status}`, u)
+    return r
   } catch (e) {
     if (!init?.signal?.aborted) {
-      console.error("[xt:net] native fetch failed", { url, error: e })
+      console.error("[xt:net] native fetch failed", { url: u, error: e })
     }
     throw e
   }

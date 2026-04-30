@@ -630,8 +630,17 @@ function maybeAutoplayFromUrl() {
 }
 
 async function loadChannels() {
-  if (!listStatus || !categoryListStatus || !viewport) return
+  console.log("[xt:livetv] loadChannels enter")
+  if (!listStatus || !categoryListStatus || !viewport) {
+    console.warn("[xt:livetv] loadChannels: missing DOM nodes", {
+      listStatus: !!listStatus,
+      categoryListStatus: !!categoryListStatus,
+      viewport: !!viewport,
+    })
+    return
+  }
   const active = await getActiveEntry()
+  console.log("[xt:livetv] loadChannels active=", active?._id || null)
   if (!active) {
     activePlaylistId = ""
     activePlaylistTitle = ""
@@ -698,12 +707,15 @@ async function loadChannels() {
       async () => {
         const catMap = await ensureCategoryMap()
         const r = await providerFetch(buildApiUrl(creds, "get_live_streams"))
+        console.log("[xt:livetv] get_live_streams resp status=", r.status, "ok=", r.ok)
         const body = await r.text()
+        console.log("[xt:livetv] body bytes=", body?.length ?? 0)
         if (!r.ok) {
           console.error("Upstream error body:", body)
           throw new Error(`API ${r.status}: ${body}`)
         }
         const parsed = JSON.parse(body)
+        console.log("[xt:livetv] parsed array length=", Array.isArray(parsed) ? parsed.length : "(not array)")
         const arr = Array.isArray(parsed)
           ? parsed
           : parsed?.streams || parsed?.results || []
@@ -741,9 +753,11 @@ async function loadChannels() {
       }
     )
     directUrlById = new Map()
+    console.log("[xt:livetv] cachedFetch returned len=", data?.length ?? 0, "fromCache=", fromCache)
     paintChannels(data, fromCache, age)
+    console.log("[xt:livetv] paintChannels done")
   } catch (e) {
-    console.error(e)
+    console.error("[xt:livetv] loadChannels threw:", e)
     mountVirtualList([])
     renderProviderError(listStatus, {
       providerName: activePlaylistTitle,
@@ -985,7 +999,9 @@ async function loadEPG(streamId) {
 // Boot
 // ----------------------------
 ;(async () => {
+  console.log("[xt:livetv] boot start")
   creds = await loadCreds()
+  console.log("[xt:livetv] boot creds host=", !!creds.host)
   if (creds.host) {
     loadChannels()
   } else {
