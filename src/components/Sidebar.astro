@@ -374,6 +374,7 @@ const settingsActive = path === "/settings" || path.startsWith("/settings/")
     DOWNLOADS_LIST_EVENT,
     DOWNLOAD_PROGRESS_EVENT,
   } from "@/scripts/lib/downloads.js"
+  import { toastSuccess, toastError } from "@/scripts/lib/toast.js"
 
   const sidebarBadge = document.getElementById("sidebar-downloads-badge")
   const sidebarSub = document.getElementById("sidebar-downloads-sub")
@@ -430,7 +431,44 @@ const settingsActive = path === "/settings" || path.startsWith("/settings/")
     setSub(mobileSub, active, downloading, done, total)
   }
 
-  document.addEventListener(DOWNLOADS_LIST_EVENT, update)
+  // Track per-id status so we only toast on the actual transition, not
+  // on every list re-render. Initialized from the current list so a
+  // page load doesn't fire a toast for items that were already done.
+  /** @type {Map<string, string>} */
+  const lastStatusById = new Map()
+  for (const d of listDownloads()) lastStatusById.set(d.id, d.status)
+
+  function detectTransitions() {
+    const list = listDownloads()
+    const seen = new Set()
+    for (const d of list) {
+      seen.add(d.id)
+      const prev = lastStatusById.get(d.id)
+      lastStatusById.set(d.id, d.status)
+      if (prev === d.status) continue
+      if (d.status === "done" && prev !== "done") {
+        toastSuccess("Download complete", {
+          description: d.title || d.filename || "",
+        })
+      } else if (d.status === "error" && prev !== "error") {
+        toastError("Download failed", {
+          description: [d.title || d.filename || "", d.error || ""]
+            .filter(Boolean)
+            .join("\n"),
+          duration: 6000,
+        })
+      }
+    }
+    // Drop tracked ids that no longer exist (cancelled/removed).
+    for (const id of lastStatusById.keys()) {
+      if (!seen.has(id)) lastStatusById.delete(id)
+    }
+  }
+
+  document.addEventListener(DOWNLOADS_LIST_EVENT, () => {
+    detectTransitions()
+    update()
+  })
   document.addEventListener(DOWNLOAD_PROGRESS_EVENT, update)
   update()
 

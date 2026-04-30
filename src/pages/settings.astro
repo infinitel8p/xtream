@@ -474,6 +474,7 @@ import {
       setDownloadConcurrency,
     } from "@/scripts/lib/app-settings.js"
     import { isDownloadable } from "@/scripts/lib/downloads.js"
+    import { toastSuccess, toastError } from "@/scripts/lib/toast.js"
 
     injectVersion()
 
@@ -642,10 +643,18 @@ import {
       try {
         await refreshActive()
         ok = true
+      } catch (e) {
+        toastError("Couldn't refresh playlist", {
+          description: (e && e.message) || "Check your connection or login.",
+          duration: 6000,
+        })
       } finally {
         setLoading(refreshBtn, false)
         syncCache()
-        if (ok) flashSuccess(refreshBtn)
+        if (ok) {
+          flashSuccess(refreshBtn)
+          toastSuccess("Playlist refreshed")
+        }
       }
     })
 
@@ -677,8 +686,14 @@ import {
             ? "Cache was already empty."
             : `Cleared ${removed} ${removed === 1 ? "entry" : "entries"}.`
         )
+        if (removed > 0) {
+          toastSuccess("Cache cleared", {
+            description: `${removed} ${removed === 1 ? "entry" : "entries"} removed.`,
+          })
+        }
       } catch {
         flashMsg(cacheMsgEl, "Couldn't clear cache.")
+        toastError("Couldn't clear cache")
       } finally {
         setLoading(clearCacheBtn, false)
         syncCache()
