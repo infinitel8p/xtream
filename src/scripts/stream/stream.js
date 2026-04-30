@@ -9,7 +9,7 @@ import {
   normalize,
   debounce,
 } from "@/scripts/lib/creds.js"
-import { cachedFetch, getCached } from "@/scripts/lib/cache.js"
+import { cachedFetch, getCached, hydrate as hydrateCache } from "@/scripts/lib/cache.js"
 import {
   ensureLoaded as ensurePrefsLoaded,
   isFavorite,
@@ -17,10 +17,21 @@ import {
   getFavorites,
   pushRecent,
   getRecents,
+  getHiddenCategories,
+  setCategoryHidden,
 } from "@/scripts/lib/preferences.js"
+import { toast } from "@/scripts/lib/toast.js"
+import { ICON_X } from "@/scripts/lib/icons.js"
 import { providerFetch } from "@/scripts/lib/provider-fetch.js"
 import { attachPlayerFocusKeeper } from "@/scripts/lib/player-focus-keeper.js"
 import { renderProviderError } from "@/scripts/lib/provider-error.js"
+import {
+  loadProgrammes,
+  getProgrammesSync,
+  getNowNext,
+  EPG_LOADED_EVENT,
+  EPG_OFFSET_EVENT,
+} from "@/scripts/lib/epg-data.js"
 
 const CHANNELS_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -174,6 +185,18 @@ document.addEventListener("xt:active-changed", () => {
   loadChannels()
 })
 
+document.addEventListener(EPG_LOADED_EVENT, (e) => {
+  const detail = /** @type {CustomEvent} */ (e).detail
+  if (!detail || detail.playlistId !== activePlaylistId) return
+  refreshNowSlots()
+})
+
+document.addEventListener(EPG_OFFSET_EVENT, (e) => {
+  const detail = /** @type {CustomEvent} */ (e).detail
+  if (!detail || detail.playlistId !== activePlaylistId) return
+  ensureEpgLoaded()
+})
+
 const CAT_FAVORITES = "__favorites__"
 const CAT_RECENTS = "__recents__"
 
@@ -194,6 +217,14 @@ document.addEventListener("xt:recents-changed", (e) => {
   syncPseudoCategoryRows()
 })
 
+document.addEventListener("xt:hidden-categories-changed", (e) => {
+  const detail = /** @type {CustomEvent} */ (e).detail
+  if (!detail || detail.playlistId !== activePlaylistId) return
+  if (detail.kind !== "live") return
+  renderCategoryPicker(all)
+  applyFilter()
+})
+
 const STAR_OUTLINE =
   '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17.75l-6.18 3.25 1.18-6.88L2 9.25l6.91-1L12 2l3.09 6.25 6.91 1-5 4.87 1.18 6.88z"/></svg>'
 const STAR_FILLED =
@@ -206,12 +237,17 @@ const STAR_FILLED =
 let all = []
 /** @type {Array<typeof all[number]>} */
 let filtered = []
-const hiddenCats = new Set()
+let showHidden = false
+function hiddenSet() {
+  return activePlaylistId
+    ? getHiddenCategories(activePlaylistId, "live")
+    : new Set()
+}
 
 /** @type {Map<string,string> | null} */
 let categoryMap = null
 
-const ROW_H = 56
+const ROW_H = 68
 const OVERSCAN = 6
 let renderScheduled = false
 
@@ -226,6 +262,75 @@ function mountVirtualList(items) {
 
   pendingFocusIdx = -1
   renderVirtual()
+}
+
+function fmtNowTimeRange(start, stop) {
+  try {
+    const fmt = new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    })
+    return `${fmt.format(start)}–${fmt.format(stop)}`
+  } catch {
+    return ""
+  }
+}
+
+function paintNowSlot(slot, playBtn, ch) {
+  if (!slot) return
+  slot.replaceChildren()
+  const state = activePlaylistId ? getProgrammesSync(activePlaylistId) : null
+  if (!state || !ch.tvgId) return
+  const { current, next } = getNowNext(state.programmes, ch.tvgId)
+  if (!current && !next) return
+
+  if (current) {
+    const line = document.createElement("div")
+    line.className = "channel-now"
+    line.textContent = current.title
+    slot.appendChild(line)
+
+    const bar = document.createElement("div")
+    bar.className = "channel-now-bar"
+    bar.setAttribute("aria-hidden", "true")
+    const fill = document.createElement("i")
+    const span = current.stop - current.start
+    const pct =
+      span > 0
+        ? Math.max(0, Math.min(100, ((Date.now() - current.start) / span) * 100))
+        : 0
+    fill.style.width = `${pct}%`
+    bar.appendChild(fill)
+    slot.appendChild(bar)
+  } else if (next) {
+    const line = document.createElement("div")
+    line.className = "channel-now channel-now--upcoming"
+    line.textContent = `Next: ${next.title}`
+    slot.appendChild(line)
+  }
+
+  if (playBtn) {
+    const parts = [ch.name || ""]
+    if (current) {
+      parts.push(`Now: ${current.title} (${fmtNowTimeRange(current.start, current.stop)})`)
+    }
+    if (next) {
+      parts.push(`Next: ${next.title} (${fmtNowTimeRange(next.start, next.stop)})`)
+    }
+    playBtn.title = parts.filter(Boolean).join("\n")
+  }
+}
+
+function refreshNowSlots() {
+  if (!viewport) return
+  for (const row of viewport.querySelectorAll(".channel-row")) {
+    const idx = Number(row.dataset.idx)
+    const ch = filtered[idx]
+    if (!ch) continue
+    const slot = row.querySelector(".channel-now-slot")
+    const playBtn = row.querySelector("[data-role='play']")
+    paintNowSlot(slot, playBtn, ch)
+  }
 }
 
 function renderVirtual() {
@@ -284,6 +389,10 @@ function renderVirtual() {
     meta.className = "truncate text-xs text-fg-3 tabular-nums"
     meta.textContent = `#${ch.id}${ch.category ? ` · ${ch.category}` : ""}`
     wrap.append(nameEl, meta)
+    const nowSlot = document.createElement("div")
+    nowSlot.className = "channel-now-slot"
+    wrap.appendChild(nowSlot)
+    paintNowSlot(nowSlot, playBtn, ch)
     playBtn.appendChild(wrap)
 
     const fav = activePlaylistId
@@ -308,7 +417,10 @@ function renderVirtual() {
     starBtn.addEventListener("click", (e) => {
       e.stopPropagation()
       if (!activePlaylistId) return
-      toggleFavorite(activePlaylistId, "live", ch.id)
+      toggleFavorite(activePlaylistId, "live", ch.id, {
+        name: ch.name || "",
+        logo: ch.logo || null,
+      })
       starBtn.classList.remove("star-pulse")
       void starBtn.offsetWidth
       starBtn.classList.add("star-pulse")
@@ -421,7 +533,7 @@ const applyFilter = () => {
     out = all.filter((ch) => {
       if (activeCat && (ch.category || "") !== activeCat) return false
       const cat = (ch.category || "").toString()
-      if (cat && hiddenCats.has(cat)) return false
+      if (cat && hiddenSet().has(cat)) return false
       return true
     })
   }
@@ -468,6 +580,9 @@ function renderCategoryPicker(items) {
   const names = Array.from(counts.keys()).sort((a, b) =>
     a.localeCompare(b, "en", { sensitivity: "base" })
   )
+  const hidden = hiddenSet()
+  const visibleNames = names.filter((n) => !hidden.has(n))
+  const hiddenNames = names.filter((n) => hidden.has(n))
   const frag = document.createDocumentFragment()
 
   const highlightActiveInList = () => {
@@ -476,21 +591,66 @@ function renderCategoryPicker(items) {
     }
   }
 
-  const addRow = (val, label, count = null, extraClass = "") => {
+  const addRow = (val, label, count = null, extraClass = "", opts = {}) => {
     const btn = document.createElement("button")
     btn.type = "button"
     btn.setAttribute("role", "option")
     btn.dataset.val = val
     btn.className =
-      "w-full py-2 px-2 text-sm flex items-center justify-between hover:bg-surface-2 focus:bg-surface-2 outline-none text-fg" +
-      (extraClass ? " " + extraClass : "")
+      "group/cat relative w-full py-2 px-2 text-sm flex items-center justify-between hover:bg-surface-2 focus:bg-surface-2 outline-none text-fg" +
+      (extraClass ? " " + extraClass : "") +
+      (opts.dim ? " opacity-60" : "")
     const left = document.createElement("span")
     left.className = "truncate"
     left.textContent = label
+    btn.appendChild(left)
+
     const right = document.createElement("span")
-    right.className = "category-count ml-3 shrink-0 text-xs text-fg-3 tabular-nums"
-    right.textContent = count != null ? String(count) : ""
-    btn.append(left, right)
+    right.className = "ml-3 shrink-0 flex items-center gap-1.5"
+
+    if (opts.hideAction === "hide" || opts.hideAction === "unhide") {
+      const action = document.createElement("button")
+      action.type = "button"
+      action.tabIndex = 0
+      action.className =
+        "category-hide-btn shrink-0 size-6 inline-flex items-center justify-center rounded-md text-fg-3 hover:text-fg hover:bg-surface-3 focus-visible:bg-surface-3 focus-visible:text-fg outline-none opacity-0 group-hover/cat:opacity-100 group-focus-within/cat:opacity-100 focus-visible:opacity-100 transition-opacity"
+      action.setAttribute(
+        "aria-label",
+        opts.hideAction === "hide"
+          ? `Hide category "${label}"`
+          : `Unhide category "${label}"`
+      )
+      action.title = opts.hideAction === "hide" ? "Hide category" : "Unhide category"
+      action.innerHTML =
+        opts.hideAction === "hide"
+          ? ICON_X
+          : '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7"/><circle cx="12" cy="12" r="3"/></svg>'
+      action.addEventListener("click", (ev) => {
+        ev.stopPropagation()
+        ev.preventDefault()
+        if (!activePlaylistId) return
+        const willHide = opts.hideAction === "hide"
+        setCategoryHidden(activePlaylistId, "live", val, willHide)
+        if (willHide) {
+          toast({
+            title: `Hid "${label}"`,
+            description: "Manage hidden categories in Settings.",
+            duration: 4000,
+          })
+          if (activeCat === val) {
+            setActiveCat("")
+          }
+        }
+      })
+      right.appendChild(action)
+    }
+
+    const countEl = document.createElement("span")
+    countEl.className = "category-count text-xs text-fg-3 tabular-nums"
+    countEl.textContent = count != null ? String(count) : ""
+    right.appendChild(countEl)
+
+    btn.appendChild(right)
     btn.addEventListener("click", () => {
       setActiveCat(val)
       highlightActiveInList()
@@ -509,11 +669,37 @@ function renderCategoryPicker(items) {
   if (recs.length === 0) recRow.style.display = "none"
 
   addRow("", "All categories")
-  for (const name of names) addRow(name, name, counts.get(name))
+  for (const name of visibleNames) {
+    addRow(name, name, counts.get(name), "", { hideAction: "hide" })
+  }
+
+  if (hiddenNames.length) {
+    const toggle = document.createElement("button")
+    toggle.type = "button"
+    toggle.className =
+      "w-full px-2 py-2 text-xs text-fg-3 hover:text-fg hover:bg-surface-2 focus:bg-surface-2 outline-none flex items-center justify-between"
+    toggle.innerHTML =
+      `<span class="truncate">${showHidden ? "Hide" : "Show"} ${hiddenNames.length} hidden ${hiddenNames.length === 1 ? "category" : "categories"}</span>` +
+      `<span class="ml-3 shrink-0 tabular-nums">${showHidden ? "▴" : "▾"}</span>`
+    toggle.addEventListener("click", () => {
+      showHidden = !showHidden
+      renderCategoryPicker(items)
+    })
+    frag.appendChild(toggle)
+    if (showHidden) {
+      for (const name of hiddenNames) {
+        addRow(name, name, counts.get(name), "", {
+          hideAction: "unhide",
+          dim: true,
+        })
+      }
+    }
+  }
 
   categoryListEl.innerHTML = ""
   if (categoryListStatus) {
-    categoryListStatus.textContent = `${names.length.toLocaleString()} categories`
+    const total = visibleNames.length
+    categoryListStatus.textContent = `${total.toLocaleString()} ${total === 1 ? "category" : "categories"}${hiddenNames.length ? ` · ${hiddenNames.length} hidden` : ""}`
   }
   categoryListEl.appendChild(frag)
 
@@ -605,6 +791,13 @@ function paintChannels(data, fromCache, age) {
   renderCategoryPicker(all)
   applyFilter()
   maybeAutoplayFromUrl()
+  ensureEpgLoaded()
+}
+
+function ensureEpgLoaded() {
+  if (!activePlaylistId || !creds.host) return
+  if (!all.some((ch) => ch.tvgId)) return
+  loadProgrammes(activePlaylistId, creds).catch(() => {})
 }
 
 let autoplayConsumed = false
@@ -651,6 +844,10 @@ async function loadChannels() {
   activePlaylistTitle = active.title || ""
 
   await ensurePrefsLoaded()
+  await Promise.all([
+    hydrateCache(active._id, "live"),
+    hydrateCache(active._id, "m3u"),
+  ])
 
   const liveHit = getCached(active._id, "live")
   const m3uHit = getCached(active._id, "m3u")
@@ -937,6 +1134,11 @@ const escapeHtml = (s) =>
     "'": "&#39;",
   })[c])
 
+/** @type {Array<{ start:number, stop:number, title:string, desc:string }>} */
+let epgListData = []
+let epgListChannelId = 0
+let epgListChannelName = ""
+
 async function loadEPG(streamId) {
   if (!epgList) return
   const url = buildApiUrl(creds, "get_short_epg", {
@@ -945,6 +1147,9 @@ async function loadEPG(streamId) {
   })
 
   epgList.innerHTML = `<div class="text-fg-3">Loading EPG…</div>`
+  epgListData = []
+  epgListChannelId = streamId
+  epgListChannelName = all.find((c) => c.id === streamId)?.name || ""
   try {
     const r = await providerFetch(url)
     if (!r.ok) throw new Error(await r.text())
@@ -960,24 +1165,28 @@ async function loadEPG(streamId) {
       return
     }
 
-    const nowSec = Math.floor(Date.now() / 1000)
-    epgList.innerHTML = items
-      .map((it) => {
-        const startTs = Number(it.start_timestamp || it.start)
-        const endTs = Number(it.stop_timestamp || it.end)
-        const isLive =
-          Number.isFinite(startTs) &&
-          Number.isFinite(endTs) &&
-          startTs <= nowSec &&
-          nowSec < endTs
-        const start = fmtTime(startTs)
-        const end = fmtTime(endTs)
-        const title = escapeHtml(maybeB64ToUtf8(it.title || it.title_raw || ""))
-        const desc = escapeHtml(
-          maybeB64ToUtf8(it.description || it.description_raw || "")
-        )
+    const now = Date.now()
+    epgListData = items
+      .map((it) => ({
+        start: Number(it.start_timestamp || it.start) * 1000,
+        stop: Number(it.stop_timestamp || it.end) * 1000,
+        title: maybeB64ToUtf8(it.title || it.title_raw || "Untitled"),
+        desc: maybeB64ToUtf8(it.description || it.description_raw || ""),
+      }))
+      .filter((p) => Number.isFinite(p.start) && Number.isFinite(p.stop) && p.stop > p.start)
+
+    epgList.innerHTML = epgListData
+      .map((p, idx) => {
+        const isLive = p.start <= now && now < p.stop
+        const start = fmtTime(p.start / 1000)
+        const end = fmtTime(p.stop / 1000)
+        const title = escapeHtml(p.title)
+        const desc = escapeHtml(p.desc)
         return `
-          <div class="rounded-lg p-2 ${isLive ? "bg-accent-soft ring-1 ring-accent/30" : "bg-surface-2"}">
+          <button type="button" data-epg-idx="${idx}"
+            class="epg-entry block w-full min-h-11 text-left rounded-lg px-3 py-2 outline-none transition-colors
+                   ${isLive ? "bg-accent-soft ring-1 ring-accent/30 hover:bg-accent/20" : "bg-surface-2 hover:bg-surface-3"}
+                   focus-visible:ring-2 focus-visible:ring-accent">
             <div class="flex items-center justify-between gap-2">
               <div class="flex items-center gap-2 min-w-0">
                 ${isLive ? '<span class="size-1.5 rounded-full bg-accent shrink-0" aria-label="Now playing"></span>' : ""}
@@ -986,7 +1195,7 @@ async function loadEPG(streamId) {
               <div class="text-xs text-fg-3 tabular-nums shrink-0">${start}–${end}</div>
             </div>
             ${desc ? `<div class="mt-1 text-sm text-fg-2 leading-relaxed line-clamp-3">${desc}</div>` : ""}
-          </div>`
+          </button>`
       })
       .join("")
   } catch (e) {
@@ -994,6 +1203,35 @@ async function loadEPG(streamId) {
     epgList.innerHTML = `<div class="text-bad">Failed to load EPG.</div>`
   }
 }
+
+epgList?.addEventListener("click", async (e) => {
+  const target = /** @type {HTMLElement | null} */ (e.target)
+  const btn = target?.closest("[data-epg-idx]")
+  if (!btn) return
+  const idx = Number(/** @type {HTMLElement} */ (btn).dataset.epgIdx)
+  const entry = epgListData[idx]
+  if (!entry) return
+  const { openProgrammeDialog } = await import("@/scripts/lib/programme-dialog.js")
+  openProgrammeDialog({
+    title: entry.title,
+    desc: entry.desc,
+    start: entry.start,
+    stop: entry.stop,
+    channelName: epgListChannelName,
+    channelId: epgListChannelId,
+    onWatch: () => {
+      if (currentlyPlayingId !== epgListChannelId && epgListChannelId) {
+        play(epgListChannelId, epgListChannelName)
+      }
+    },
+  })
+})
+
+setInterval(() => {
+  if (!activePlaylistId) return
+  if (!getProgrammesSync(activePlaylistId)) return
+  refreshNowSlots()
+}, 60 * 1000)
 
 // ----------------------------
 // Boot

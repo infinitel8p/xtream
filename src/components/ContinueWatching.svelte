@@ -7,7 +7,7 @@
     getContinueWatching,
     clearProgress,
   } from "@/scripts/lib/preferences.js"
-  import { getCached } from "@/scripts/lib/cache.js"
+  import { getCached, hydrate as hydrateCache } from "@/scripts/lib/cache.js"
 
   /** @type {Array<{
    *   kind: "vod" | "episode",
@@ -72,6 +72,7 @@
     }
     activePlaylistId = active._id
     await ensurePrefsLoaded()
+    await hydrateCache(active._id, "vod")
 
     const vodList = getCached(active._id, "vod")?.data || []
     const vodById = new Map(vodList.map((m) => [Number(m.id), m]))
@@ -120,8 +121,8 @@
     <ul
       class="cw-strip flex gap-3 sm:gap-4 overflow-x-auto custom-scroll
              snap-x snap-mandatory py-2 -my-1 -mx-1 px-1">
-      {#each entries as e (e.kind + ":" + e.id)}
-        <li class="cw-item shrink-0 snap-start">
+      {#each entries as e, i (e.kind + ":" + e.id)}
+        <li class="cw-item shrink-0 snap-start" style:--enter-delay={Math.min(i, 6) * 28 + "ms"}>
           <a
             href={e.href}
             aria-label={`Resume ${e.name}`}
@@ -196,20 +197,30 @@
 <style>
   .cw-item {
     width: 8rem;
+    animation: cw-enter 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: var(--enter-delay, 0ms);
+    content-visibility: auto;
+    contain-intrinsic-size: 8rem 13rem;
   }
   @media (min-width: 40em) {
     .cw-item {
       width: 9.5rem;
+      contain-intrinsic-size: 9.5rem 16rem;
     }
   }
   @media (min-width: 64em) {
     .cw-item {
       width: 11rem;
+      contain-intrinsic-size: 11rem 18rem;
     }
   }
 
-  /* Disabled in first-run mode (no playlists yet). The hub already hides
-     #welcome and #hub-tiles around this state; the strip follows. */
+  @keyframes cw-enter {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Disabled in first-run mode */
   :global(html[data-first-run="true"]) .cw-section {
     display: none;
   }
@@ -218,9 +229,25 @@
     transition: width 240ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
+  /* Touch adaptation */
+  @media (pointer: coarse) {
+    .cw-dismiss {
+      width: 2.25rem;
+      height: 2.25rem;
+      opacity: 0.7;
+    }
+    .cw-dismiss :global(svg) {
+      width: 1rem;
+      height: 1rem;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .cw-progress-fill {
       transition: none;
+    }
+    .cw-item {
+      animation: none;
     }
   }
 </style>

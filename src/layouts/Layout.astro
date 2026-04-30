@@ -1,5 +1,6 @@
 ---
 import Sidebar from "@/components/Sidebar.astro"
+import CatalogWarmingIndicator from "@/components/CatalogWarmingIndicator.svelte"
 import "../styles/global.css"
 
 interface Props {
@@ -51,6 +52,7 @@ const documentTitle = pageTitle
                 landscape-phone:overflow-y-auto">
       <slot />
     </div>
+    <CatalogWarmingIndicator client:load />
   </body>
 </html>
 
@@ -82,9 +84,30 @@ const documentTitle = pageTitle
     "color: oklch(0.6 0.011 250); font: 0.75rem/1.4 ui-sans-serif, system-ui;"
   )
 
-  import("@/scripts/expiration.js").then((m) => m.injectExpirationDate?.())
-  document.addEventListener("xt:active-changed", () => {
+  const onLogin = () =>
+    location.pathname === "/login" || location.pathname.startsWith("/login/")
+  if (!onLogin()) {
     import("@/scripts/expiration.js").then((m) => m.injectExpirationDate?.())
+  }
+  document.addEventListener("xt:active-changed", () => {
+    if (onLogin()) return
+    import("@/scripts/expiration.js").then((m) => m.injectExpirationDate?.())
+  })
+
+  document.addEventListener("keydown", (ev) => {
+    if (!(ev.metaKey || ev.ctrlKey) || ev.key.toLowerCase() !== "k") return
+    ev.preventDefault()
+    if (location.pathname === "/search" || location.pathname.startsWith("/search/")) {
+      const input = document.querySelector(
+        'main input[type="search"]'
+      )
+      if (input) {
+        input.focus()
+        input.select?.()
+      }
+      return
+    }
+    location.href = "/search"
   })
 
   window.addEventListener("load", function () {

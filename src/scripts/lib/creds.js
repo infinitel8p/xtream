@@ -268,6 +268,28 @@ export async function updateEntry(id, patch) {
   if (s.selectedId === id) dispatch(EVT_ACTIVE_CHANGED, await getActiveEntry())
 }
 
+/**
+ * Replace the entire playlist state. Used by the import-settings flow.
+ * Caller is responsible for sanitising the input shape before calling.
+ * @param {{ entries: any[], selectedId: string }} state
+ */
+export async function restoreState(state) {
+  const safe = {
+    entries: Array.isArray(state?.entries) ? state.entries : [],
+    selectedId: typeof state?.selectedId === "string" ? state.selectedId : "",
+  }
+  await writeRaw(safe)
+  migrationPromise = Promise.resolve(safe)
+  try {
+    const { invalidateEntry } = await import("./cache.js")
+    for (const e of safe.entries) {
+      if (e?._id) invalidateEntry(e._id)
+    }
+  } catch {}
+  dispatch(EVT_ENTRIES_UPDATED)
+  dispatch(EVT_ACTIVE_CHANGED, safe.entries.find((e) => e._id === safe.selectedId) || null)
+}
+
 /** Force a re-fetch of the active playlist's data. */
 export async function refreshActive() {
   const active = await getActiveEntry()

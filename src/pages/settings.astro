@@ -9,7 +9,11 @@ import {
   IconCloudDownload,
   IconBrandGithub,
   IconDeviceFloppy,
+  IconDownload,
+  IconUpload,
 } from "@tabler/icons-svelte"
+import HiddenCategoriesEditor from "@/components/HiddenCategoriesEditor.svelte"
+import FavoritesReorder from "@/components/FavoritesReorder.svelte"
 ---
 
 <Layout pageTitle="Settings">
@@ -157,6 +161,34 @@ import {
           </div>
         </article>
 
+        <!-- EPG: time zone offset (per active playlist) -->
+        <article id="epg-tz-section" class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+          <div class="flex flex-col gap-1">
+            <h3 class="text-base font-semibold">EPG time zone</h3>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Some providers ship XMLTV with timestamps already shifted to the server's local time, so EPG times look off. Auto-detect picks the offset where the most channels have a programme airing right now.
+            </p>
+          </div>
+          <label class="flex flex-col gap-1.5">
+            <span class="text-eyebrow font-medium uppercase text-fg-3">
+              Offset for active playlist
+            </span>
+            <select
+              id="epg-tz-select"
+              disabled
+              class="rounded-xl border border-line bg-bg min-h-11 px-3 py-2 text-sm text-fg
+                     hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent
+                     disabled:opacity-60 disabled:cursor-not-allowed
+                     transition-colors">
+              <option value="auto">Auto-detect</option>
+            </select>
+          </label>
+          <div
+            id="epg-tz-status"
+            aria-live="polite"
+            class="text-xs text-fg-3"></div>
+        </article>
+
         <!-- Network: User-Agent spoofing -->
         <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
           <div class="flex flex-col gap-1">
@@ -264,6 +296,52 @@ import {
               <button type="button" data-concurrency="3" aria-pressed="false" class="dl-concurrency-btn btn">3</button>
               <button type="button" data-concurrency="4" aria-pressed="false" class="dl-concurrency-btn btn">4</button>
             </div>
+          </div>
+        </article>
+
+        <!-- Hidden categories editor -->
+        <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+          <div class="flex flex-col gap-1">
+            <h3 class="text-base font-semibold">Categories</h3>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Per-playlist mute list. Hidden categories are hidden from
+              the picker and the main grid on Live TV, Movies, and Series.
+            </p>
+          </div>
+          <HiddenCategoriesEditor client:load />
+        </article>
+
+        <!-- Favorites order -->
+        <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+          <div class="flex flex-col gap-1">
+            <h3 class="text-base font-semibold">Favorites</h3>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Reorder your favorites per kind. The hub Favorites strip and
+              the per-page favorites filter follow this order.
+            </p>
+          </div>
+          <FavoritesReorder client:load />
+        </article>
+
+        <!-- Backup / restore -->
+        <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+          <div class="flex flex-col gap-1">
+            <h3 class="text-base font-semibold">Backup</h3>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Save all playlists, favorites, recents, watched progress, hidden categories, and app settings to a file. Cache and the downloads queue are not exported.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 pt-1">
+            <button id="settings-export" type="button" class="btn">
+              <IconDownload aria-hidden="true" class="btn-icon" />
+              Export to file
+            </button>
+            <button id="settings-import" type="button" class="btn">
+              <IconUpload aria-hidden="true" class="btn-icon" />
+              Import from file
+            </button>
+            <input id="settings-import-input" type="file" accept="application/json,.json" hidden />
+            <span id="settings-backup-msg" aria-live="polite" class="text-xs text-fg-3 transition-opacity duration-300"></span>
           </div>
         </article>
 
@@ -457,7 +535,11 @@ import {
       refreshActive,
       isTauri,
     } from "@/scripts/lib/creds.js"
-    import { getNewestCacheTime } from "@/scripts/lib/cache.js"
+    import {
+      getNewestCacheTimeAsync,
+      getCacheSizeAsync,
+      clearAll as clearAllCache,
+    } from "@/scripts/lib/cache.js"
     import {
       renderPlaylistRow,
       PLAYLIST_LIST_EMPTY_COPY,
@@ -475,6 +557,11 @@ import {
     } from "@/scripts/lib/app-settings.js"
     import { isDownloadable } from "@/scripts/lib/downloads.js"
     import { toastSuccess, toastError } from "@/scripts/lib/toast.js"
+    import {
+      getOffsetSetting,
+      setOffsetSetting,
+      getProgrammesSync,
+    } from "@/scripts/lib/epg-data.js"
 
     injectVersion()
 
@@ -613,28 +700,17 @@ import {
       else refreshBtn?.classList.add("hidden")
     }
 
-    function syncCache() {
-      let bytes = 0
-      let entries = 0
+    async function syncCache() {
       try {
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i)
-          if (!k || !k.startsWith("xt_cache:")) continue
-          const v = localStorage.getItem(k) || ""
-          // Approximate - UTF-16 code units in localStorage; doubling gives
-          // closer-to-actual byte count.
-          bytes += k.length + v.length * 2
-          entries++
-        }
+        const bytes = await getCacheSizeAsync()
+        if (cacheSizeEl) cacheSizeEl.textContent = fmtBytes(bytes)
+        if (clearCacheBtn) clearCacheBtn.disabled = bytes === 0
       } catch {}
-      if (cacheSizeEl) cacheSizeEl.textContent = fmtBytes(bytes)
-      if (clearCacheBtn) clearCacheBtn.disabled = entries === 0
-
-      ;(async () => {
+      try {
         const a = await getActiveEntry()
-        const newest = a ? getNewestCacheTime(a._id) : null
+        const newest = a ? await getNewestCacheTimeAsync(a._id) : null
         if (cacheNewestEl) cacheNewestEl.textContent = fmtAge(newest)
-      })()
+      } catch {}
     }
 
     refreshBtn?.addEventListener("click", async () => {
@@ -658,46 +734,152 @@ import {
       }
     })
 
-    clearCacheBtn?.addEventListener("click", () => {
+    clearCacheBtn?.addEventListener("click", async () => {
       setLoading(clearCacheBtn, true)
       let removed = 0
       let ok = false
       try {
-        const toRemove = []
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i)
-          if (k && (k.startsWith("xt_cache:") || k === "xt_cache_meta"))
-            toRemove.push(k)
-        }
-        for (const k of toRemove) localStorage.removeItem(k)
-        try {
-          const sessRemove = []
-          for (let i = 0; i < sessionStorage.length; i++) {
-            const k = sessionStorage.key(i)
-            if (k && k.startsWith("xt_cache:")) sessRemove.push(k)
-          }
-          for (const k of sessRemove) sessionStorage.removeItem(k)
-        } catch {}
-        removed = toRemove.length
+        removed = await clearAllCache()
         ok = true
-        flashMsg(
-          cacheMsgEl,
-          removed === 0
-            ? "Cache was already empty."
-            : `Cleared ${removed} ${removed === 1 ? "entry" : "entries"}.`
-        )
         if (removed > 0) {
           toastSuccess("Cache cleared", {
             description: `${removed} ${removed === 1 ? "entry" : "entries"} removed.`,
           })
+        } else {
+          // Quiet inline message - not worth a toast for a no-op.
+          flashMsg(cacheMsgEl, "Cache was already empty.")
         }
       } catch {
-        flashMsg(cacheMsgEl, "Couldn't clear cache.")
         toastError("Couldn't clear cache")
       } finally {
         setLoading(clearCacheBtn, false)
         syncCache()
         if (ok && removed > 0) flashSuccess(clearCacheBtn)
+      }
+    })
+
+    // -------------------------
+    // Backup: export / import
+    // -------------------------
+    const exportBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("settings-export"))
+    const importBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("settings-import"))
+    const importInput = /** @type {HTMLInputElement|null} */ (document.getElementById("settings-import-input"))
+    const backupMsgEl = document.getElementById("settings-backup-msg")
+
+    async function downloadBlobWeb(name, content) {
+      const blob = new Blob([content], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 5000)
+    }
+
+    exportBtn?.addEventListener("click", async () => {
+      setLoading(exportBtn, true)
+      try {
+        const { exportAll, suggestedFilename } = await import("@/scripts/lib/backup.js")
+        const snapshot = await exportAll()
+        const json = JSON.stringify(snapshot, null, 2)
+        const filename = suggestedFilename()
+        if (isTauri) {
+          try {
+            const { save } = await import("@tauri-apps/plugin-dialog")
+            const target = await save({
+              defaultPath: filename,
+              filters: [{ name: "JSON", extensions: ["json"] }],
+            })
+            if (!target) {
+              setLoading(exportBtn, false)
+              return
+            }
+            const { writeTextFile } = await import("@tauri-apps/plugin-fs")
+            await writeTextFile(target, json)
+          } catch (e) {
+            console.error("[settings:export] tauri save failed:", e)
+            await downloadBlobWeb(filename, json)
+          }
+        } else {
+          await downloadBlobWeb(filename, json)
+        }
+        toastSuccess("Backup exported", {
+          description: `${snapshot.creds.entries.length} playlist(s).`,
+        })
+        flashMsg(backupMsgEl, "Saved.")
+      } catch (e) {
+        console.error("[settings:export] failed:", e)
+        toastError("Couldn't export backup", {
+          description: (e && e.message) || "See console.",
+        })
+      } finally {
+        setLoading(exportBtn, false)
+      }
+    })
+
+    async function applyImport(text) {
+      const ok = window.confirm(
+        "Import will replace all playlists, favorites, recents, watched progress, hidden categories, and app settings on this device. Continue?"
+      )
+      if (!ok) return
+      let parsed
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        toastError("Couldn't parse backup file", {
+          description: "Not valid JSON.",
+        })
+        return
+      }
+      try {
+        const { importAll } = await import("@/scripts/lib/backup.js")
+        const summary = await importAll(parsed)
+        toastSuccess("Backup restored", {
+          description: `${summary.playlists} playlist(s), ${summary.prefsPlaylists} preference set(s).`,
+          duration: 6000,
+        })
+        flashMsg(backupMsgEl, "Imported.")
+        // Force a hub/sidebar refresh by re-rendering playlists.
+        await renderPlaylists()
+        syncCache()
+      } catch (e) {
+        toastError("Couldn't restore backup", {
+          description: (e && e.message) || "See console.",
+        })
+      }
+    }
+
+    importBtn?.addEventListener("click", async () => {
+      if (isTauri) {
+        try {
+          const { open } = await import("@tauri-apps/plugin-dialog")
+          const picked = await open({
+            multiple: false,
+            directory: false,
+            filters: [{ name: "JSON", extensions: ["json"] }],
+          })
+          if (!picked || typeof picked !== "string") return
+          const { readTextFile } = await import("@tauri-apps/plugin-fs")
+          const text = await readTextFile(picked)
+          await applyImport(text)
+          return
+        } catch (e) {
+          console.warn("[settings:import] tauri open failed, falling back:", e)
+        }
+      }
+      importInput?.click()
+    })
+
+    importInput?.addEventListener("change", async () => {
+      const file = importInput?.files?.[0]
+      if (!file) return
+      try {
+        const text = await file.text()
+        await applyImport(text)
+      } finally {
+        if (importInput) importInput.value = ""
       }
     })
 
@@ -726,6 +908,7 @@ import {
       if (!resetConfirmBtn) return
       setLoading(resetConfirmBtn, true)
       try {
+        try { await clearAllCache() } catch {}
         try { localStorage.clear() } catch {}
         try { sessionStorage.clear() } catch {}
         try {
@@ -917,6 +1100,71 @@ import {
       applyChannelWidth(v)
     })
     syncChannelWidthButtons()
+
+    // ---------------------------------------------------------------------
+    // EPG time zone offset (per active playlist)
+    // ---------------------------------------------------------------------
+    const tzSelect = /** @type {HTMLSelectElement|null} */ (
+      document.getElementById("epg-tz-select")
+    )
+    const tzStatus = document.getElementById("epg-tz-status")
+    if (tzSelect) {
+      tzSelect.replaceChildren()
+      const autoOpt = document.createElement("option")
+      autoOpt.value = "auto"
+      autoOpt.textContent = "Auto-detect"
+      tzSelect.appendChild(autoOpt)
+      for (let mins = -12 * 60; mins <= 14 * 60; mins += 30) {
+        const sign = mins < 0 ? "-" : "+"
+        const abs = Math.abs(mins)
+        const h = Math.floor(abs / 60)
+        const m = abs % 60
+        const label = `UTC${sign}${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+        const opt = document.createElement("option")
+        opt.value = String(mins)
+        opt.textContent = label
+        tzSelect.appendChild(opt)
+      }
+    }
+
+    let tzActiveId = ""
+    async function syncTz() {
+      const active = await getActiveEntry()
+      if (!tzSelect || !tzStatus) return
+      if (!active) {
+        tzActiveId = ""
+        tzSelect.disabled = true
+        tzSelect.value = "auto"
+        tzStatus.textContent = "No playlist selected."
+        return
+      }
+      tzActiveId = active._id
+      tzSelect.disabled = false
+      const setting = getOffsetSetting(active._id)
+      tzSelect.value = setting === "auto" ? "auto" : String(setting)
+      const state = getProgrammesSync(active._id)
+      if (state) {
+        const sign = state.offsetMin < 0 ? "-" : "+"
+        const abs = Math.abs(state.offsetMin)
+        const label = `UTC${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`
+        tzStatus.textContent = state.offsetIsAuto
+          ? `Auto-detected ${label}.`
+          : `Using manual ${label}.`
+      } else {
+        tzStatus.textContent =
+          "EPG hasn't been loaded for this playlist yet - open Live TV or the EPG grid first."
+      }
+    }
+    tzSelect?.addEventListener("change", () => {
+      if (!tzActiveId) return
+      const raw = tzSelect.value
+      setOffsetSetting(tzActiveId, raw === "auto" ? "auto" : Number(raw))
+      if (tzStatus) tzStatus.textContent = "Saved. Applies next time EPG loads."
+    })
+    document.addEventListener("xt:active-changed", syncTz)
+    document.addEventListener("xt:epg-loaded", syncTz)
+    document.addEventListener("xt:epg-offset-changed", syncTz)
+    syncTz()
 
     // ---------------------------------------------------------------------
     // Network / User-Agent

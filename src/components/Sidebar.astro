@@ -1,6 +1,5 @@
 ---
 import {
-  IconInfinity,
   IconHome,
   IconDeviceTv,
   IconMovie,
@@ -9,6 +8,7 @@ import {
   IconDownload,
   IconSettings,
   IconLayoutGrid,
+  IconSearch,
 } from "@tabler/icons-svelte"
 import PlaylistSwitcher from "@/components/PlaylistSwitcher.astro"
 
@@ -23,10 +23,6 @@ const items = [
   { href: "/downloads", label: "Downloads", Icon: IconDownload,     match: (p) => p === "/downloads" || p.startsWith("/downloads/"), id: "nav-downloads" },
 ]
 
-// Portrait phone bottom bar: 4 destinations + a center "More" trigger
-// that expands a panel containing the rest. EPG stays desktop-only on
-// portrait because the grid view doesn't fit a phone in portrait; in
-// landscape we use the side rail instead, which lists everything.
 const tabItems = [
   items.find((i) => i.href === "/"),
   items.find((i) => i.href === "/livetv"),
@@ -43,8 +39,6 @@ const moreActive = moreItems.some((i) => i.match(path))
 const settingsActive = path === "/settings" || path.startsWith("/settings/")
 ---
 
-<!-- Side rail: md+ AND landscape phones. The rail itself scrolls when
-     content overflows so the rest of the page stays anchored. -->
 <aside
   class="hidden md:flex landscape-phone:flex md:order-first landscape-phone:order-first
          shrink-0 flex-col gap-2 border-r border-line bg-bg
@@ -52,29 +46,71 @@ const settingsActive = path === "/settings" || path.startsWith("/settings/")
          p-2 lg:p-3
          pl-[max(0.5rem,env(safe-area-inset-left))]
          pb-[max(0.5rem,env(safe-area-inset-bottom))]
+         md:sticky md:top-0 md:self-start md:h-dvh md:overflow-y-auto
          landscape-phone:sticky landscape-phone:top-0
-         landscape-phone:max-h-screen landscape-phone:overflow-y-auto
-         lg:custom-scroll
+         landscape-phone:h-dvh landscape-phone:overflow-y-auto
+         custom-scroll
          landscape-phone:[scrollbar-width:none]
          landscape-phone:[&::-webkit-scrollbar]:hidden">
 
   <a
     href="/"
     aria-label="Extreme InfiniTV - Home"
-    class="[view-transition-name:brand-mark]
+    class="brand-mark group [view-transition-name:brand-mark]
            flex items-center gap-3 rounded-xl px-2 py-2
            justify-center lg:justify-start
-           hover:bg-surface-2 focus-visible:bg-surface-2
-           transition-colors">
-    <span class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-accent ring-1 ring-line">
-      <IconInfinity aria-hidden="true" class="size-5 text-bg" />
-    </span>
-    <span class="hidden lg:inline truncate text-sm font-semibold tracking-tight text-fg">
-      Extreme InfiniTV
+           focus-visible:bg-surface-2
+           transition-colors outline-none">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+      class="brand-mark__svg shrink-0 size-10 text-accent">
+      <path
+        class="brand-mark__base"
+        d="M 12 12 C 12 7, 19 7, 19 12 C 19 17, 12 17, 12 12 C 12 7, 5 7, 5 12 C 5 17, 12 17, 12 12 Z" />
+      <path
+        class="brand-mark__trail"
+        pathLength="100"
+        stroke-dasharray="22 78"
+        stroke-dashoffset="0"
+        d="M 12 12 C 12 7, 19 7, 19 12 C 19 17, 12 17, 12 12 C 12 7, 5 7, 5 12 C 5 17, 12 17, 12 12 Z" />
+    </svg>
+    <span class="hidden lg:inline-flex items-baseline truncate text-sm tracking-[-0.01em]">
+      <span class="font-medium text-fg-2">Extreme&nbsp;Infini</span><span class="font-bold text-accent tracking-wide">TV</span>
     </span>
   </a>
 
-  <nav class="flex flex-col gap-1 flex-1 mt-2" aria-label="Main">
+  {(() => {
+    const searchActive = path === "/search" || path.startsWith("/search/")
+    return (
+      <a
+        href="/search"
+        aria-label="Search (Ctrl+K)"
+        title="Search (Ctrl+K)"
+        aria-current={searchActive ? "page" : undefined}
+        class:list={[
+          "mt-2 flex items-center gap-3 rounded-xl px-2.5 py-2.5 min-h-11",
+          "justify-center lg:justify-start",
+          "border border-line bg-surface",
+          "transition-colors outline-none",
+          searchActive
+            ? "bg-surface-2 text-fg ring-1 ring-accent/40 border-transparent"
+            : "text-fg-2 hover:bg-surface-2 hover:text-fg focus-visible:bg-surface-2 focus-visible:text-fg focus-visible:border-accent",
+        ]}>
+        <IconSearch aria-hidden="true" stroke={searchActive ? 2 : 1.75} class:list={["size-5 shrink-0", searchActive ? "text-accent" : "text-fg-3"]} />
+        <span class="hidden lg:inline truncate text-sm flex-1 text-left">Search</span>
+        <kbd class="hidden lg:inline-block text-2xs text-fg-3 border border-line rounded px-1.5 py-0.5 font-sans">
+          Ctrl K
+        </kbd>
+      </a>
+    )
+  })()}
+
+  <nav class="flex flex-col gap-1 flex-1 mt-1" aria-label="Main">
     {items.map(({ href, label, Icon, match, id }) => {
       const active = match(path)
       const isDownloads = id === "nav-downloads"
@@ -202,6 +238,20 @@ const settingsActive = path === "/settings" || path.startsWith("/settings/")
            transition-[transform,opacity] duration-200 ease-out
            data-[open=true]:translate-y-0 data-[open=true]:opacity-100 data-[open=true]:pointer-events-auto">
     <ul class="flex flex-col gap-1 px-3 py-3">
+      <li>
+        <a
+          href="/search"
+          aria-label="Search"
+          class="group w-full flex items-center gap-3 rounded-xl px-2.5 py-2 min-h-12
+                 transition-[color,background-color,transform] duration-150 outline-none
+                 hover:bg-surface-2 focus-visible:bg-surface-2 active:scale-[0.99]
+                 text-fg-2 hover:text-fg focus-visible:text-fg">
+          <span class="relative flex size-10 shrink-0 items-center justify-center rounded-lg ring-1 transition-colors bg-surface ring-line group-hover:ring-line-soft">
+            <IconSearch aria-hidden="true" stroke={1.75} class="size-5 shrink-0 text-fg-2" />
+          </span>
+          <span class="truncate text-sm font-medium">Search</span>
+        </a>
+      </li>
       {moreItems.map(({ href, label, Icon, match, id }) => {
         const active = match(path)
         const isDownloads = id === "mobile-more-downloads"
@@ -376,6 +426,28 @@ const settingsActive = path === "/settings" || path.startsWith("/settings/")
   } from "@/scripts/lib/downloads.js"
   import { toastSuccess, toastError } from "@/scripts/lib/toast.js"
 
+  function onLoginPage() {
+    return (
+      location.pathname === "/login" ||
+      location.pathname.startsWith("/login/")
+    )
+  }
+  function maybeWarmup() {
+    if (onLoginPage()) return
+    import("@/scripts/lib/catalog.js")
+      .then((m) => m.warmupActive())
+      .catch(() => {})
+  }
+  document.addEventListener("xt:active-changed", () => {
+    maybeWarmup()
+  })
+
+  if (typeof window !== "undefined") {
+    window.requestIdleCallback
+      ? window.requestIdleCallback(maybeWarmup, { timeout: 2000 })
+      : setTimeout(maybeWarmup, 500)
+  }
+
   const sidebarBadge = document.getElementById("sidebar-downloads-badge")
   const sidebarSub = document.getElementById("sidebar-downloads-sub")
   const mobileBadge = document.getElementById("mobile-more-downloads-badge")
@@ -512,3 +584,46 @@ const settingsActive = path === "/settings" || path.startsWith("/settings/")
     }
   })
 </script>
+
+<style>
+  /* Faint base ring so the full infinity is always recognisable. */
+  .brand-mark__base {
+    stroke: var(--color-accent);
+    stroke-width: 1.5;
+    opacity: 0.28;
+    vector-effect: non-scaling-stroke;
+  }
+
+  /* Bright laser segment with a soft accent glow, traveling the path. */
+  .brand-mark__trail {
+    stroke: var(--color-accent);
+    stroke-width: 1.75;
+    vector-effect: non-scaling-stroke;
+    filter: drop-shadow(0 0 2px var(--color-accent))
+            drop-shadow(0 0 4px var(--color-accent-soft));
+    animation: brand-mark-trail 6s linear infinite;
+  }
+  @keyframes brand-mark-trail {
+    to { stroke-dashoffset: -100; }
+  }
+
+  /* Hover/focus: trail speeds up, glow intensifies, base brightens. */
+  .brand-mark:hover .brand-mark__trail,
+  .brand-mark:focus-visible .brand-mark__trail {
+    animation-duration: 2.4s;
+    filter: drop-shadow(0 0 3px var(--color-accent))
+            drop-shadow(0 0 8px var(--color-accent));
+  }
+  .brand-mark:hover .brand-mark__base,
+  .brand-mark:focus-visible .brand-mark__base {
+    opacity: 0.55;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .brand-mark__trail {
+      animation: none;
+      stroke-dasharray: none;
+    }
+    .brand-mark__base { opacity: 0.7; }
+  }
+</style>

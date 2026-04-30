@@ -652,7 +652,10 @@ window.addEventListener("pagehide", () => {
 // ----------------------------
 favBtn?.addEventListener("click", () => {
   if (!series || !activePlaylistId) return
-  toggleFavorite(activePlaylistId, "series", series.id)
+  toggleFavorite(activePlaylistId, "series", series.id, {
+    name: series.name || series.title || "",
+    logo: series.logo || series.cover || null,
+  })
 })
 
 document.addEventListener("xt:favorites-changed", (e) => {

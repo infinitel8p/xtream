@@ -1,28 +1,5 @@
-// Per-playlist favorites + recently-played + playback progress, persisted
-// alongside creds.
-//
-// Storage shape (one JSON blob under "xt_prefs"):
-//   { [playlistId]: {
-//       favLive: number[], favVod: number[], favSeries: number[],
-//       recLive: RecentEntry[], recVod: RecentEntry[], recSeries: RecentEntry[],
-//       progVod: { [movieId]: VodProgressEntry },
-//       progEpisode: { [episodeId]: EpisodeProgressEntry }
-//     } }
-// RecentEntry          = { id, name, logo?, ts }   // ts = ms since epoch
-// ProgressEntry        = { position, duration, updatedAt, completed }
-// VodProgressEntry     = ProgressEntry & { name?, logo? }
-// EpisodeProgressEntry = ProgressEntry & {
-//   seriesId, season, episodeNum, episodeTitle?, seriesName?, seriesLogo?
-// }
-//
-// Live channel ids, VOD movie ids and series ids each share a numeric space
-// per provider but mean different things, so favorites/recents/progress are
-// namespaced by kind at the leaf, not by id.
-//
-// Same dual-mode persistence as creds.js: Tauri plugin-store on desktop,
-// localStorage + cookie on web/SSR. Reads are served from an in-memory cache
-// that is hydrated lazily on first use, so per-row hot paths
-// (e.g. virtualised channel render, episode list paint) can stay synchronous.
+// Per-playlist favorites + recently-played + playback progress + view
+// preferences (hidden categories, sort order), persisted alongside creds.
 import { Store } from "@tauri-apps/plugin-store"
 
 const isTauri =
@@ -36,6 +13,9 @@ const COMPLETED_THRESHOLD = 0.95
 const EVT_FAV_CHANGED = "xt:favorites-changed"
 const EVT_REC_CHANGED = "xt:recents-changed"
 const EVT_PROGRESS_CHANGED = "xt:progress-changed"
+const EVT_HIDDEN_CHANGED = "xt:hidden-categories-changed"
+const EVT_VIEW_CHANGED = "xt:view-prefs-changed"
+const EVT_FAV_ORDER_CHANGED = "xt:favorites-order-changed"
 
 let storePromise = null
 function getStore() {
@@ -119,11 +99,21 @@ function emptyEntry() {
     favLive: new Set(),
     favVod: new Set(),
     favSeries: new Set(),
+    favMetaLive: Object.create(null),
+    favMetaVod: Object.create(null),
+    favMetaSeries: Object.create(null),
     recLive: [],
     recVod: [],
     recSeries: [],
     progVod: Object.create(null),
     progEpisode: Object.create(null),
+    hiddenLive: new Set(),
+    hiddenVod: new Set(),
+    hiddenSeries: new Set(),
+    favOrderLive: [],
+    favOrderVod: [],
+    favOrderSeries: [],
+    viewSort: { vod: "default", series: "default" },
   }
 }
 
@@ -132,10 +122,23 @@ function hydrate(raw) {
   if (!raw || typeof raw !== "object") return
   for (const [pid, val] of Object.entries(raw)) {
     if (!val || typeof val !== "object") continue
+    const v = val.viewSort && typeof val.viewSort === "object" ? val.viewSort : {}
     cache.set(pid, {
       favLive: new Set(Array.isArray(val.favLive) ? val.favLive : []),
       favVod: new Set(Array.isArray(val.favVod) ? val.favVod : []),
       favSeries: new Set(Array.isArray(val.favSeries) ? val.favSeries : []),
+      favMetaLive:
+        val.favMetaLive && typeof val.favMetaLive === "object"
+          ? { ...val.favMetaLive }
+          : Object.create(null),
+      favMetaVod:
+        val.favMetaVod && typeof val.favMetaVod === "object"
+          ? { ...val.favMetaVod }
+          : Object.create(null),
+      favMetaSeries:
+        val.favMetaSeries && typeof val.favMetaSeries === "object"
+          ? { ...val.favMetaSeries }
+          : Object.create(null),
       recLive: Array.isArray(val.recLive) ? val.recLive.slice(0, RECENT_CAP) : [],
       recVod: Array.isArray(val.recVod) ? val.recVod.slice(0, RECENT_CAP) : [],
       recSeries: Array.isArray(val.recSeries)
@@ -149,6 +152,30 @@ function hydrate(raw) {
         val.progEpisode && typeof val.progEpisode === "object"
           ? { ...val.progEpisode }
           : Object.create(null),
+      hiddenLive: new Set(
+        Array.isArray(val.hiddenLive) ? val.hiddenLive.map(String) : []
+      ),
+      hiddenVod: new Set(
+        Array.isArray(val.hiddenVod) ? val.hiddenVod.map(String) : []
+      ),
+      hiddenSeries: new Set(
+        Array.isArray(val.hiddenSeries) ? val.hiddenSeries.map(String) : []
+      ),
+      favOrderLive: Array.isArray(val.favOrderLive)
+        ? val.favOrderLive.map(Number).filter(Number.isFinite)
+        : [],
+      favOrderVod: Array.isArray(val.favOrderVod)
+        ? val.favOrderVod.map(Number).filter(Number.isFinite)
+        : [],
+      favOrderSeries: Array.isArray(val.favOrderSeries)
+        ? val.favOrderSeries.map(Number).filter(Number.isFinite)
+        : [],
+      viewSort: {
+        vod: ["default", "added", "az"].includes(v.vod) ? v.vod : "default",
+        series: ["default", "added", "az"].includes(v.series)
+          ? v.series
+          : "default",
+      },
     })
   }
 }
@@ -160,11 +187,21 @@ function dehydrate() {
       favLive: [...v.favLive],
       favVod: [...v.favVod],
       favSeries: [...v.favSeries],
+      favMetaLive: v.favMetaLive,
+      favMetaVod: v.favMetaVod,
+      favMetaSeries: v.favMetaSeries,
       recLive: v.recLive,
       recVod: v.recVod,
       recSeries: v.recSeries,
       progVod: v.progVod,
       progEpisode: v.progEpisode,
+      hiddenLive: [...v.hiddenLive],
+      hiddenVod: [...v.hiddenVod],
+      hiddenSeries: [...v.hiddenSeries],
+      favOrderLive: v.favOrderLive.slice(),
+      favOrderVod: v.favOrderVod.slice(),
+      favOrderSeries: v.favOrderSeries.slice(),
+      viewSort: { vod: v.viewSort.vod, series: v.viewSort.series },
     }
   }
   return out
@@ -218,6 +255,12 @@ function favKey(kind) {
   return "favLive"
 }
 /** @param {"live"|"vod"|"series"} kind */
+function favMetaKey(kind) {
+  if (kind === "vod") return "favMetaVod"
+  if (kind === "series") return "favMetaSeries"
+  return "favMetaLive"
+}
+/** @param {"live"|"vod"|"series"} kind */
 function recKey(kind) {
   if (kind === "vod") return "recVod"
   if (kind === "series") return "recSeries"
@@ -225,11 +268,6 @@ function recKey(kind) {
 }
 
 /**
- * Synchronous read from the in-memory cache. Caller is responsible for
- * `await ensureLoaded()` before relying on results - but if loading hasn't
- * happened yet, this returns an empty Set rather than throwing, which is
- * correct for "show no stars yet" behaviour during the initial render.
- *
  * @param {string} playlistId
  * @param {"live"|"vod"} kind
  * @returns {Set<number>}
@@ -246,24 +284,55 @@ export function isFavorite(playlistId, kind, id) {
 }
 
 /**
- * Toggle and persist. Returns the new state (true = is now a favorite).
- * @param {string} playlistId @param {"live"|"vod"} kind @param {number} id
+ * @param {string} playlistId @param {"live"|"vod"|"series"} kind @param {number} id
+ * @param {{ name?: string, logo?: string|null }} [extras]
  */
-export function toggleFavorite(playlistId, kind, id) {
+export function toggleFavorite(playlistId, kind, id, extras) {
   if (!playlistId || id == null) return false
   const e = getOrCreate(playlistId)
   const set = e[favKey(kind)]
+  const meta = e[favMetaKey(kind)]
   let isFav
   if (set.has(id)) {
     set.delete(id)
+    delete meta[String(id)]
     isFav = false
   } else {
     set.add(id)
+    if (extras && (extras.name || extras.logo !== undefined)) {
+      meta[String(id)] = {
+        name: extras.name || meta[String(id)]?.name || "",
+        logo: extras.logo === undefined ? meta[String(id)]?.logo || null : extras.logo,
+      }
+    }
     isFav = true
   }
   scheduleSave()
   dispatch(EVT_FAV_CHANGED, { playlistId, kind, id, isFav })
   return isFav
+}
+
+export function setFavoriteMeta(playlistId, kind, id, meta) {
+  if (!playlistId || id == null) return
+  const e = cache.get(playlistId)
+  if (!e || !e[favKey(kind)].has(Number(id))) return
+  const bag = e[favMetaKey(kind)]
+  const k = String(id)
+  const prev = bag[k] || {}
+  const next = {
+    name: meta?.name || prev.name || "",
+    logo: meta?.logo === undefined ? prev.logo || null : meta.logo,
+  }
+  if (prev.name === next.name && prev.logo === next.logo) return
+  bag[k] = next
+  scheduleSave()
+}
+
+export function getFavoriteMeta(playlistId, kind, id) {
+  if (!playlistId || id == null) return null
+  const e = cache.get(playlistId)
+  if (!e) return null
+  return e[favMetaKey(kind)][String(id)] || null
 }
 
 /**
@@ -277,12 +346,6 @@ export function getRecents(playlistId, kind) {
 }
 
 /**
- * Push an entry to recents. Dedupes (same id moves to top), capped at
- * RECENT_CAP. Safe to call on every play() - internal short-circuit keeps it
- * cheap when the same channel is replayed. We store name + logo alongside the
- * id so the recent rail can render *before* the channel list has loaded
- * (matches iptvnator's pattern: recents survive a stale-cache cold start).
- *
  * @param {string} playlistId @param {"live"|"vod"} kind
  * @param {number} id @param {string} name @param {string|null} [logo]
  */
@@ -367,12 +430,6 @@ export function getProgressFraction(playlistId, kind, id) {
   return Math.max(0, Math.min(1, (p.position || 0) / p.duration))
 }
 
-/**
- * Trim the kind-bucket so it doesn't grow without bound. Drops the
- * oldest-updated entries when over PROGRESS_CAP. Keeps completed entries
- * in eviction order with everything else - the Continue Watching strip
- * filters them out anyway.
- */
 function trimBucket(bucket) {
   const keys = Object.keys(bucket)
   if (keys.length <= PROGRESS_CAP) return
@@ -382,17 +439,6 @@ function trimBucket(bucket) {
 }
 
 /**
- * Record progress for a movie or episode. `position` and `duration` are in
- * seconds. When `position / duration >= COMPLETED_THRESHOLD`, the entry is
- * marked completed; subsequent setProgress calls won't un-complete it.
- *
- * For VOD entries, pass `extras` with name / logo so the Continue Watching
- * strip can render without depending on a fresh VOD list cache.
- *
- * For episode entries, pass `extras` with seriesId / season / episodeNum
- * (and optionally episodeTitle / seriesName / seriesLogo) so the Continue
- * Watching strip can render without depending on a fresh series list.
- *
  * @param {string} playlistId
  * @param {"vod"|"episode"} kind
  * @param {number|string} id
@@ -497,12 +543,6 @@ export function clearProgress(playlistId, kind, id) {
 }
 
 /**
- * Continue Watching entries for a playlist - in-progress (not completed)
- * movies and episodes, sorted most-recent-first. Each entry has a `kind`
- * and `id` plus the underlying ProgressEntry fields, so the caller can
- * render without further lookups (episodes carry seriesId / season /
- * episodeNum / seriesName / seriesLogo on the record itself).
- *
  * @param {string} playlistId
  * @param {number} [limit]
  * @returns {Array<{kind: "vod"|"episode", id: string} & (VodProgressEntry|EpisodeProgressEntry)>}
@@ -526,3 +566,179 @@ export function getContinueWatching(playlistId, limit = 6) {
 }
 
 export const PROGRESS_COMPLETED_THRESHOLD = COMPLETED_THRESHOLD
+
+// ---------------------------------------------------------------------------
+// Hidden categories
+// ---------------------------------------------------------------------------
+/** @param {"live"|"vod"|"series"} kind */
+function hiddenKey(kind) {
+  if (kind === "vod") return "hiddenVod"
+  if (kind === "series") return "hiddenSeries"
+  return "hiddenLive"
+}
+
+/** @param {string} playlistId @param {"live"|"vod"|"series"} kind */
+export function getHiddenCategories(playlistId, kind) {
+  const e = cache.get(playlistId)
+  return e ? e[hiddenKey(kind)] : new Set()
+}
+
+/** @param {string} playlistId @param {"live"|"vod"|"series"} kind @param {string|number} categoryId */
+export function isCategoryHidden(playlistId, kind, categoryId) {
+  if (categoryId == null) return false
+  const e = cache.get(playlistId)
+  return !!e && e[hiddenKey(kind)].has(String(categoryId))
+}
+
+/**
+ * @param {string} playlistId
+ * @param {"live"|"vod"|"series"} kind
+ * @param {string|number} categoryId
+ * @param {boolean} hidden
+ */
+export function setCategoryHidden(playlistId, kind, categoryId, hidden) {
+  if (!playlistId || categoryId == null) return
+  const e = getOrCreate(playlistId)
+  const set = e[hiddenKey(kind)]
+  const id = String(categoryId)
+  const had = set.has(id)
+  if (hidden && !had) set.add(id)
+  else if (!hidden && had) set.delete(id)
+  else return
+  scheduleSave()
+  dispatch(EVT_HIDDEN_CHANGED, { playlistId, kind, categoryId: id, hidden })
+}
+
+/** Filter a category list, dropping hidden ones. Each item must expose
+ *  `category_id` (Xtream) or `id` (our M3U-shape category). */
+export function filterVisibleCategories(playlistId, kind, categories) {
+  if (!Array.isArray(categories) || !categories.length) return categories || []
+  const set = getHiddenCategories(playlistId, kind)
+  if (!set.size) return categories
+  return categories.filter(
+    (c) => !set.has(String(c.category_id ?? c.id ?? ""))
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Favorites ordering
+// ---------------------------------------------------------------------------
+/** @param {"live"|"vod"|"series"} kind */
+function favOrderKey(kind) {
+  if (kind === "vod") return "favOrderVod"
+  if (kind === "series") return "favOrderSeries"
+  return "favOrderLive"
+}
+
+/**
+ * @param {string} playlistId @param {"live"|"vod"|"series"} kind
+ * @returns {number[]}
+ */
+export function getFavoritesOrdered(playlistId, kind) {
+  const e = cache.get(playlistId)
+  if (!e) return []
+  const set = e[favKey(kind)]
+  if (!set.size) return []
+  const order = e[favOrderKey(kind)]
+  const out = []
+  const seen = new Set()
+  for (const id of order) {
+    if (set.has(id) && !seen.has(id)) {
+      out.push(id)
+      seen.add(id)
+    }
+  }
+  for (const id of set) {
+    if (!seen.has(id)) out.push(id)
+  }
+  return out
+}
+
+/**
+ * @param {string} playlistId @param {"live"|"vod"|"series"} kind @param {number[]} ids
+ */
+export function setFavoritesOrder(playlistId, kind, ids) {
+  if (!playlistId || !Array.isArray(ids)) return
+  const e = getOrCreate(playlistId)
+  const set = e[favKey(kind)]
+  const next = []
+  const seen = new Set()
+  for (const raw of ids) {
+    const id = Number(raw)
+    if (!Number.isFinite(id)) continue
+    if (!set.has(id) || seen.has(id)) continue
+    next.push(id)
+    seen.add(id)
+  }
+  e[favOrderKey(kind)] = next
+  scheduleSave()
+  dispatch(EVT_FAV_ORDER_CHANGED, { playlistId, kind })
+}
+
+/**
+ * Move one favorite up or down by one slot. Returns the new order.
+ * @param {string} playlistId @param {"live"|"vod"|"series"} kind
+ * @param {number} id @param {-1|1} delta -1 = up, +1 = down
+ */
+export function moveFavorite(playlistId, kind, id, delta) {
+  if (!playlistId || id == null || (delta !== -1 && delta !== 1)) return []
+  const order = getFavoritesOrdered(playlistId, kind)
+  const idx = order.indexOf(Number(id))
+  if (idx === -1) return order
+  const target = idx + delta
+  if (target < 0 || target >= order.length) return order
+  ;[order[idx], order[target]] = [order[target], order[idx]]
+  setFavoritesOrder(playlistId, kind, order)
+  return order
+}
+
+/**
+ * @param {string} playlistId
+ * @returns {Array<{ kind: "live"|"vod"|"series", id: number }>}
+ */
+export function getGlobalFavorites(playlistId) {
+  if (!playlistId) return []
+  const out = []
+  for (const kind of /** @type {const} */ (["live", "vod", "series"])) {
+    for (const id of getFavoritesOrdered(playlistId, kind)) {
+      out.push({ kind, id })
+    }
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// View sort preferences (recently-added etc.)
+// ---------------------------------------------------------------------------
+const VALID_SORTS = new Set(["default", "added", "az"])
+
+/** @param {string} playlistId @param {"vod"|"series"} kind */
+export function getViewSort(playlistId, kind) {
+  const e = cache.get(playlistId)
+  const v = e?.viewSort?.[kind]
+  return VALID_SORTS.has(v) ? v : "default"
+}
+
+/** @param {string} playlistId @param {"vod"|"series"} kind @param {string} mode */
+export function setViewSort(playlistId, kind, mode) {
+  if (!playlistId) return
+  const m = VALID_SORTS.has(mode) ? mode : "default"
+  const e = getOrCreate(playlistId)
+  if (e.viewSort[kind] === m) return
+  e.viewSort[kind] = m
+  scheduleSave()
+  dispatch(EVT_VIEW_CHANGED, { playlistId, kind, mode: m })
+}
+
+// ---------------------------------------------------------------------------
+// Bulk export / import (used by backup.js)
+// ---------------------------------------------------------------------------
+/** Snapshot the in-memory cache as JSON-safe data. */
+export function snapshotPrefs() {
+  return dehydrate()
+}
+
+export async function restorePrefs(snapshot) {
+  hydrate(snapshot && typeof snapshot === "object" ? snapshot : {})
+  await writeRaw(dehydrate())
+}

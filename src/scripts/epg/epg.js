@@ -2,16 +2,20 @@
 import {
   loadCreds,
   getActiveEntry,
-  fmtBase,
   buildApiUrl,
   isLikelyM3USource,
   normalize,
   debounce,
 } from "@/scripts/lib/creds.js"
 import { getCached } from "@/scripts/lib/cache.js"
-import { fetchAndMaybeGunzip } from "@/scripts/lib/network.js"
 import { providerFetch } from "@/scripts/lib/provider-fetch.js"
 import { renderProviderError } from "@/scripts/lib/provider-error.js"
+import {
+  loadProgrammes,
+  invalidateEpgPlaylist,
+  EPG_OFFSET_EVENT,
+} from "@/scripts/lib/epg-data.js"
+import { openProgrammeDialog } from "@/scripts/lib/programme-dialog.js"
 
 const PX_PER_HOUR = 200
 const HOURS_VISIBLE = 6
@@ -28,6 +32,7 @@ const headerInner = document.getElementById("epg-time-header-inner")
 const bodyEl = document.getElementById("epg-body")
 const titleEl = document.getElementById("epg-title")
 const refreshBtn = document.getElementById("epg-refresh")
+const nowBtn = document.getElementById("epg-now")
 const categoryLabelEl = document.getElementById("epg-category-label")
 const categoryListEl = document.getElementById("epg-category-list")
 const categoryListStatus = document.getElementById("epg-category-list-status")
@@ -82,68 +87,6 @@ function showProviderError(kind) {
 function hideStatus() {
   if (statusEl) statusEl.classList.add("hidden")
   if (gridEl) gridEl.classList.remove("hidden")
-}
-
-// ----------------------------
-// XMLTV parsing
-// ----------------------------
-function parseXmlTvDate(s) {
-  if (!s) return 0
-  const trimmed = s.trim()
-  // 14 digits, optional space + signed 4-digit offset.
-  const m = trimmed.match(
-    /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:\s*([+-])(\d{2})(\d{2}))?$/
-  )
-  if (!m) return 0
-  const [, y, mo, d, h, mi, s2, sign, oh, om] = m
-  const utc = Date.UTC(+y, +mo - 1, +d, +h, +mi, +s2)
-  if (!sign) return utc
-  const offsetMs = (parseInt(oh, 10) * 60 + parseInt(om, 10)) * 60 * 1000
-  return sign === "+" ? utc - offsetMs : utc + offsetMs
-}
-
-function parseXmlTv(xml) {
-  programmes.clear()
-  const doc = new DOMParser().parseFromString(xml, "text/xml")
-  const err = doc.querySelector("parsererror")
-  if (err) throw new Error("XMLTV parse error: " + err.textContent.slice(0, 200))
-
-  const lo = Date.now() - 60 * 60 * 1000
-  const hi = Date.now() + 24 * 60 * 60 * 1000
-
-  const list = doc.querySelectorAll("programme")
-  for (const p of list) {
-    const ch = (p.getAttribute("channel") || "").toLowerCase()
-    if (!ch) continue
-    const start = parseXmlTvDate(p.getAttribute("start") || "")
-    const stop = parseXmlTvDate(p.getAttribute("stop") || "")
-    if (!start || !stop || stop <= start) continue
-    if (stop < lo || start > hi) continue
-
-    const title =
-      p.querySelector("title")?.textContent?.trim() || "Untitled"
-    const desc = p.querySelector("desc")?.textContent?.trim() || ""
-
-    let arr = programmes.get(ch)
-    if (!arr) {
-      arr = []
-      programmes.set(ch, arr)
-    }
-    arr.push({ start, stop, title, desc })
-  }
-
-  for (const arr of programmes.values()) {
-    arr.sort((a, b) => a.start - b.start)
-    let lastStop = -Infinity
-    let writeIdx = 0
-    for (let i = 0; i < arr.length; i++) {
-      if (arr[i].start >= lastStop) {
-        arr[writeIdx++] = arr[i]
-        lastStop = arr[i].stop
-      }
-    }
-    arr.length = writeIdx
-  }
 }
 
 // ----------------------------
@@ -263,7 +206,14 @@ function renderChannelRow(channel, programmesForRow) {
     cell.style.width = `${width}px`
     cell.title = `${fmtTime(p.start)}–${fmtTime(p.stop)} · ${p.title}${p.desc ? "\n\n" + p.desc : ""}`
     cell.addEventListener("click", () => {
-      window.location.href = `/livetv?channel=${encodeURIComponent(channel.id)}`
+      openProgrammeDialog({
+        title: p.title,
+        desc: p.desc,
+        start: p.start,
+        stop: p.stop,
+        channelName: channel.name,
+        channelId: channel.id,
+      })
     })
 
     const titleLine = document.createElement("div")
@@ -396,30 +346,6 @@ async function fetchXtreamChannels() {
     .sort((a, b) =>
       a.name.localeCompare(b.name, "en", { sensitivity: "base" })
     )
-}
-
-async function loadEpgXml() {
-  if (isLikelyM3USource(creds.host, creds.user, creds.pass)) {
-    const url =
-      (() => {
-        try {
-          return localStorage.getItem(`xt_m3u_epg:${activePlaylistId}`) || ""
-        } catch {
-          return ""
-        }
-      })()
-    if (!url) {
-      throw new Error(
-        "This M3U playlist doesn't expose an EPG URL (`x-tvg-url`)."
-      )
-    }
-    return fetchAndMaybeGunzip(url)
-  }
-  const base = fmtBase(creds.host, creds.port).replace(/\/+$/, "")
-  const url =
-    `${base}/xmltv.php?username=${encodeURIComponent(creds.user)}` +
-    `&password=${encodeURIComponent(creds.pass)}`
-  return fetchAndMaybeGunzip(url)
 }
 
 // ----------------------------
@@ -613,9 +539,11 @@ async function init() {
 
   showStatus("Loading EPG (this can take a moment for large providers)…")
 
+  programmes.clear()
   try {
-    const xml = await loadEpgXml()
-    parseXmlTv(xml)
+    const state = await loadProgrammes(activePlaylistId, creds, { force: true })
+    if (!state) throw new Error("EPG fetch failed")
+    for (const [k, v] of state.programmes) programmes.set(k, v)
   } catch (e) {
     console.error("[epg] load failed:", e)
     showProviderError("EPG")
@@ -633,6 +561,31 @@ async function init() {
 }
 
 refreshBtn?.addEventListener("click", () => {
+  if (activePlaylistId) invalidateEpgPlaylist(activePlaylistId)
+  programmes.clear()
+  init()
+})
+
+nowBtn?.addEventListener("click", () => {
+  if (!gridEl) return
+  viewStart = roundHalfHourFloor(Date.now() - 30 * 60 * 1000)
+  if (programmes.size && channels.length) render()
+  // Centre the now-line about a third in from the left of the visible width.
+  const visible = gridEl.clientWidth || 0
+  const target = Math.max(
+    0,
+    CHANNEL_COL_WIDTH + timeToX(Date.now()) - Math.max(120, visible / 3)
+  )
+  try {
+    gridEl.scrollTo({ left: target, behavior: "smooth" })
+  } catch {
+    gridEl.scrollLeft = target
+  }
+})
+
+document.addEventListener(EPG_OFFSET_EVENT, (e) => {
+  const detail = /** @type {CustomEvent} */ (e).detail
+  if (!detail || detail.playlistId !== activePlaylistId) return
   programmes.clear()
   init()
 })
