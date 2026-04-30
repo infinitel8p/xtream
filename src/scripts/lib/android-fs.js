@@ -165,8 +165,24 @@ export async function fileExists(uri) {
   }
 }
 
-export function convertSrc(uri) {
-  return import("tauri-plugin-android-fs-api").then((m) =>
-    m.AndroidFs.convertFileSrc(uri)
-  )
+export async function convertSrc(uri) {
+  const m = await mod()
+  if (!m) throw new Error("Android FS plugin not available")
+  // Prefer the real filesystem path through Tauri's asset protocol - Video.js
+  // and the WebView's media element both handle https://asset.localhost/...
+  // URLs reliably. The plugin's own convertFileSrc returns a custom-protocol
+  // URL that some WebView media pipelines reject for video playback.
+  try {
+    const fsPath = await m.AndroidFs.getFsPath(uri)
+    if (fsPath) {
+      const { convertFileSrc } = await import("@tauri-apps/api/core")
+      return convertFileSrc(fsPath)
+    }
+  } catch (e) {
+    console.warn(
+      "[xt:android-fs] getFsPath failed, falling back to plugin convertFileSrc:",
+      e
+    )
+  }
+  return m.AndroidFs.convertFileSrc(uri)
 }
