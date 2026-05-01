@@ -10,8 +10,8 @@ body:
 
         **Not a bug in the app?**
         - Stream won't play, EPG missing, channels missing -> use the **Playback / provider issue** template instead.
-        - Question about how to use the app -> open a [Discussion](https://github.com/infinitel8p/xtream/discussions).
-        - Found a security vulnerability -> please report it privately via [Security Advisories](https://github.com/infinitel8p/xtream/security/advisories/new), not here.
+        - Question about how to use the app -> open a [Discussion](https://github.com/infinitel8p/Extreme-InfiniTV/discussions).
+        - Found a security vulnerability -> please report it privately via [Security Advisories](https://github.com/infinitel8p/Extreme-InfiniTV/security/advisories/new), not here.
   - type: textarea
     id: summary
     attributes:
@@ -100,7 +100,7 @@ body:
     attributes:
       label: Confirmation
       options:
-        - label: I searched [existing issues](https://github.com/infinitel8p/xtream/issues?q=is%3Aissue) and didn't find a duplicate.
+        - label: I searched [existing issues](https://github.com/infinitel8p/Extreme-InfiniTV/issues?q=is%3Aissue) and didn't find a duplicate.
           required: true
         - label: I'm running the latest version, or I've explained why I can't be.
           required: true

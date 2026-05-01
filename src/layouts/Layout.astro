@@ -84,7 +84,7 @@ const documentTitle = pageTitle
   const SpatialNavigation = window.SpatialNavigation
 
   console.log(
-    "%c∞ Extreme InfiniTV%c\nCurious? Source: https://github.com/infinitel8p/xtream",
+    "%c∞ Extreme InfiniTV%c\nCurious? Source: https://github.com/infinitel8p/Extreme-InfiniTV",
     "color: oklch(0.78 0.15 330); font: italic 1.25rem/1 'Instrument Serif', serif",
     "color: oklch(0.6 0.011 250); font: 0.75rem/1.4 ui-sans-serif, system-ui;"
   )
@@ -117,6 +117,42 @@ const documentTitle = pageTitle
 
   initFocusGlide()
   initKeyboardHelp()
+
+  // -----------------------------------------------------------------------
+  // Discord idle presence: push "Browsing the catalog" on every page load
+  // -----------------------------------------------------------------------
+  function pageArea() {
+    const pathname = location.pathname || "/"
+    if (pathname === "/" || pathname === "") return "the hub"
+    if (pathname.startsWith("/livetv")) return "Live TV"
+    if (pathname.startsWith("/movies")) return "Movies"
+    if (pathname.startsWith("/series")) return "Series"
+    if (pathname.startsWith("/epg")) return "the EPG grid"
+    if (pathname.startsWith("/search")) return "Search"
+    if (pathname.startsWith("/favorites")) return "Favorites"
+    if (pathname.startsWith("/recently-added")) return "Recently Added"
+    if (pathname.startsWith("/downloads")) return "Downloads"
+    if (pathname.startsWith("/settings")) return "Settings"
+    return "the catalog"
+  }
+
+  async function pushIdlePresence() {
+    if (onLogin()) return
+    try {
+      const [{ setIdleRichPresence }, { getActiveEntry }] = await Promise.all([
+        import("@/scripts/lib/discord-rpc.js"),
+        import("@/scripts/lib/creds.js"),
+      ])
+      const active = await getActiveEntry()
+      setIdleRichPresence({
+        playlistId: active?._id || "",
+        playlistTitle: active?.title || "",
+        area: pageArea(),
+      }).catch(() => {})
+    } catch {}
+  }
+  pushIdlePresence()
+  document.addEventListener("xt:active-changed", pushIdlePresence)
 
   window.addEventListener("load", function () {
     SpatialNavigation.init()

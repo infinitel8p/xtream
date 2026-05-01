@@ -1,5 +1,5 @@
 {
-  "productName": "xtream",
+  "productName": "Extreme InfiniTV",
   "version": "1.2.0",
   "identifier": "com.infinitel8p.xtream",
   "build": {
@@ -56,7 +56,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE2NERBRENFQzczNDZENjQKUldSa2JUVEh6cTFOcHJzVi9PYTB0TWZFYUZEV3RrdW5LRk56cmhDcjdxQlJ1QldjbXAwNEVxWHQK",
       "endpoints": [
-        "https://github.com/infinitel8p/xtream/releases/latest/download/latest.json"
+        "https://github.com/infinitel8p/Extreme-InfiniTV/releases/latest/download/latest.json"
       ]
     }
   }

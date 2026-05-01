@@ -32,8 +32,8 @@ async function getInvoke() {
 }
 
 const PROMO_BUTTONS = [
-  { label: "Get Extreme InfiniTV", url: "https://github.com/infinitel8p/xtream/releases/latest" },
-  { label: "View on GitHub", url: "https://github.com/infinitel8p/xtream" },
+  { label: "Get Extreme InfiniTV", url: "https://github.com/infinitel8p/Extreme-InfiniTV/releases/latest" },
+  { label: "View on GitHub", url: "https://github.com/infinitel8p/Extreme-InfiniTV" },
 ]
 
 let lastSignature = ""
@@ -128,6 +128,66 @@ export async function disconnectRichPresence() {
   } catch (error) {
     console.debug("[xt:discord] disconnect failed:", error)
   } finally {
+    lastSignature = ""
+  }
+}
+
+/**
+ * Push a generic "browsing" / idle presence. Designed to be called on every
+ * page load so the user's Discord status reflects the app being open even
+ * when nothing is playing - which doubles as light advertising via the
+ * promo buttons. Active-playback presence (setRichPresence) supersedes this
+ * the moment a stream starts.
+ *
+ * @param {Object} [opts]
+ * @param {string} [opts.playlistId]    - active playlist id (for the mute check)
+ * @param {string} [opts.playlistTitle] - shown as the second line
+ * @param {string} [opts.area]          - "Live TV" / "Movies" / "Series" / "Hub" / etc.
+ */
+export async function setIdleRichPresence(opts) {
+  if (!isDesktop) return
+  if (opts?.playlistId && !isDiscordEnabledForPlaylist(opts.playlistId)) return
+  const clientId = getDiscordClientId()
+  if (!clientId) return
+
+  const detailsLine = opts?.area
+    ? `Browsing ${opts.area}`
+    : "Browsing the catalog"
+  const stateLine = opts?.playlistTitle || "Idle"
+
+  const buttons = PROMO_BUTTONS
+
+  const signature = JSON.stringify({
+    cid: clientId,
+    idle: 1,
+    d: detailsLine,
+    s: stateLine,
+    btn: buttons,
+  })
+  if (signature === lastSignature) return
+  lastSignature = signature
+
+  const invoke = await getInvoke()
+  if (!invoke) return
+
+  try {
+    await invoke("discord_set_activity", {
+      clientId,
+      details: detailsLine,
+      stateText: stateLine,
+      largeImage: "logo",
+      largeText: "Extreme InfiniTV",
+      smallImage: null,
+      smallText: null,
+      startTimestamp: null,
+      buttons,
+    })
+    lastFailureLogged = false
+  } catch (error) {
+    if (!lastFailureLogged) {
+      console.warn("[xt:discord] idle set_activity failed:", error)
+      lastFailureLogged = true
+    }
     lastSignature = ""
   }
 }

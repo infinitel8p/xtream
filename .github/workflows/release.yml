@@ -196,30 +196,30 @@ jobs:
               '',
               '| Platform | File |',
               '|----------|------|',
-              `| Windows 10/11 (recommended installer) | \`xtream_${version}_x64-setup.exe\` |`,
-              `| Windows (MSI alternative) | \`xtream_${version}_x64_en-US.msi\` |`,
-              `| macOS (Apple Silicon + Intel) | \`xtream_${version}_universal.dmg\` |`,
-              `| Linux Debian / Ubuntu / Mint | \`xtream_${version}_amd64.deb\` |`,
-              `| Linux Fedora / openSUSE / RHEL | \`xtream-${version}-1.x86_64.rpm\` |`,
-              `| Linux portable (any distro) | \`xtream_${version}_amd64.AppImage\` |`,
-              `| Android sideload (APK) | \`xtream_${version}.apk\` |`,
+              `| Windows 10/11 (recommended installer) | \`Extreme InfiniTV_${version}_x64-setup.exe\` |`,
+              `| Windows (MSI alternative) | \`Extreme InfiniTV_${version}_x64_en-US.msi\` |`,
+              `| macOS (Apple Silicon + Intel) | \`Extreme InfiniTV_${version}_universal.dmg\` |`,
+              `| Linux Debian / Ubuntu / Mint | \`extreme-infinitv_${version}_amd64.deb\` |`,
+              `| Linux Fedora / openSUSE / RHEL | \`extreme-infinitv-${version}-1.x86_64.rpm\` |`,
+              `| Linux portable (any distro) | \`extreme-infinitv_${version}_amd64.AppImage\` |`,
+              `| Android sideload (APK) | \`Extreme InfiniTV_${version}.apk\` |`,
               '',
               '<details><summary>What about the <code>.sig</code> files, <code>latest.json</code> and the macOS <code>.app.tar.gz</code>?</summary>',
               '',
               'You can ignore them.',
               '',
               '- `*.sig` and `latest.json` are used by the built-in auto-updater to verify each download is genuinely signed. The app downloads them on its own when checking for updates.',
-              '- `xtream_universal.app.tar.gz` is the macOS update bundle consumed by the same updater. For a fresh install on macOS, use the `.dmg` instead.',
+              '- `Extreme InfiniTV_universal.app.tar.gz` is the macOS update bundle consumed by the same updater. For a fresh install on macOS, use the `.dmg` instead.',
               '- The `.aab` file is uploaded to Google Play and is not meant for sideloading. Use the `.apk` to install manually.',
               '',
               '</details>',
               '',
-              '<details><summary>macOS: "xtream.app" cannot be opened / "Apple could not verify..."</summary>',
+              '<details><summary>macOS: "Extreme InfiniTV.app" cannot be opened / "Apple could not verify..."</summary>',
               '',
               'The macOS build is not yet notarized by Apple, so Gatekeeper blocks it on first launch. After dragging the app from the `.dmg` into `/Applications`, remove the quarantine flag from a Terminal:',
               '',
               '```bash',
-              'xattr -dr com.apple.quarantine /Applications/xtream.app',
+              'xattr -dr com.apple.quarantine "/Applications/Extreme InfiniTV.app"',
               '```',
               '',
               'Then open the app normally. You only need to do this once per install.',
@@ -229,7 +229,7 @@ jobs:
 
             const body = [
               '<p align="center">',
-              '  <img src="https://raw.githubusercontent.com/infinitel8p/xtream/refs/heads/main/src-tauri/icons/128x128@2x.png" alt="App Icon"/>',
+              '  <img src="https://raw.githubusercontent.com/infinitel8p/Extreme-InfiniTV/refs/heads/main/src-tauri/icons/128x128@2x.png" alt="App Icon"/>',
               '</p>',
               '',
               ...(summary ? [`<p align="center">${summary}</p>`, ''] : []),
@@ -397,8 +397,8 @@ jobs:
             find src-tauri/gen/android/app/build/outputs -type f
             exit 1
           fi
-          cp "$AAB" "$OUT/xtream_${VERSION}.aab"
-          cp "$APK" "$OUT/xtream_${VERSION}.apk"
+          cp "$AAB" "$OUT/Extreme InfiniTV_${VERSION}.aab"
+          cp "$APK" "$OUT/Extreme InfiniTV_${VERSION}.apk"
           echo "out=$OUT" >> "$GITHUB_OUTPUT"
 
       - name: Upload to release
