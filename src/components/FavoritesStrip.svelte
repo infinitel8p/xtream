@@ -124,9 +124,14 @@
       <div class="hub-section-head__title">
         <h2 class="hub-section-head__heading">Favorites</h2>
       </div>
-      <span class="hub-section-head__count">
-        <strong>{entries.length}</strong> {entries.length === 1 ? "item" : "items"}
-      </span>
+      <a
+        href="/favorites"
+        class="hub-section-head__count text-fg-3 hover:text-accent focus-visible:text-accent transition-colors">
+        View all
+        <svg viewBox="0 0 24 24" width="0.85em" height="0.85em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="ml-0.5 inline-block align-[-1px]">
+          <path d="m9 18 6-6-6-6" />
+        </svg>
+      </a>
     </div>
 
     <ul

@@ -10,6 +10,7 @@ import {
   IconLayoutGrid,
   IconSearch,
   IconSparkles,
+  IconStar,
 } from "@tabler/icons-svelte"
 import PlaylistSwitcher from "@/components/PlaylistSwitcher.astro"
 
@@ -20,6 +21,7 @@ const items = [
   { href: "/livetv",          label: "Live TV",         Icon: IconDeviceTv,     match: (p) => p === "/livetv" || p.startsWith("/livetv/") },
   { href: "/movies",          label: "Movies",          Icon: IconMovie,        match: (p) => p === "/movies" || p.startsWith("/movies/") },
   { href: "/series",          label: "Series",          Icon: IconStack2,       match: (p) => p === "/series" || p.startsWith("/series/") },
+  { href: "/favorites",       label: "Favorites",       Icon: IconStar,         match: (p) => p === "/favorites" || p.startsWith("/favorites/") },
   { href: "/recently-added",  label: "Recently added",  Icon: IconSparkles,     match: (p) => p === "/recently-added" || p.startsWith("/recently-added/") },
   { href: "/epg",             label: "EPG",             Icon: IconCalendarTime, match: (p) => p === "/epg" || p.startsWith("/epg/") },
   { href: "/downloads",       label: "Downloads",       Icon: IconDownload,     match: (p) => p === "/downloads" || p.startsWith("/downloads/"), id: "nav-downloads" },
@@ -33,6 +35,7 @@ const tabItems = [
 ]
 
 const moreItems = [
+  { href: "/favorites",      label: "Favorites",      Icon: IconStar,     match: (p) => p === "/favorites" || p.startsWith("/favorites/") },
   { href: "/recently-added", label: "Recently added", Icon: IconSparkles, match: (p) => p === "/recently-added" || p.startsWith("/recently-added/") },
   { href: "/downloads",      label: "Downloads",      Icon: IconDownload, match: (p) => p === "/downloads" || p.startsWith("/downloads/"), id: "mobile-more-downloads" },
   { href: "/settings",       label: "Settings",       Icon: IconSettings, match: (p) => p === "/settings"  || p.startsWith("/settings/") },

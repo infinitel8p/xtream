@@ -22,6 +22,8 @@
 // When credentials are present, additional welcome-state captures are saved
 // alongside the populated ones (e.g. home-welcome.png next to home.png) so
 // the empty-state hub can be showcased too.
+//
+// propagate .screenshot-state.json: copy(JSON.stringify(Object.fromEntries(Object.entries(localStorage)), null, 2))
 
 import { chromium } from "playwright"
 import { existsSync, readFileSync } from "node:fs"
@@ -44,7 +46,7 @@ const DEVICES = {
   "Galaxy-S20-Ultra": { width: 412, height: 915, deviceScaleFactor: 3.5, isMobile: true, hasTouch: true },
 }
 
-const ROUTES = ["/", "/livetv", "/movies", "/series", "/epg", "/search", "/downloads", "/settings"]
+const ROUTES = ["/", "/livetv", "/movies", "/series", "/favorites", "/recently-added", "/epg", "/search", "/downloads", "/settings"]
 const WELCOME_ROUTES = ["/"]
 
 function loadDotEnv() {

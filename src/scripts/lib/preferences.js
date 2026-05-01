@@ -837,6 +837,25 @@ export function getGlobalFavorites(playlistId) {
   return out
 }
 
+/**
+ * Cross-playlist union of favorites. Each row keeps its source `playlistId`
+ * so the caller can switch the active playlist before navigating to detail.
+ * Entries are grouped by playlist (insertion order in the cache) and ordered
+ * within a playlist by `getFavoritesOrdered`.
+ * @returns {Array<{ playlistId: string, kind: "live"|"vod"|"series", id: number }>}
+ */
+export function getAllGlobalFavorites() {
+  const out = []
+  for (const playlistId of cache.keys()) {
+    for (const kind of /** @type {const} */ (["live", "vod", "series"])) {
+      for (const id of getFavoritesOrdered(playlistId, kind)) {
+        out.push({ playlistId, kind, id })
+      }
+    }
+  }
+  return out
+}
+
 // ---------------------------------------------------------------------------
 // View sort preferences (recently-added etc.)
 // ---------------------------------------------------------------------------
