@@ -82,7 +82,7 @@ import { IconDeviceTv, IconChevronDown, IconCalendarTime, IconLayoutGrid } from 
 					<div
 						id="list"
 						class="relative flex-1 min-h-0 overflow-auto pr-1 custom-scroll
-							max-h-96 md:landscape:max-h-none lg:max-h-none">
+							max-h-96 md:landscape:max-h-[100dvh] lg:max-h-[100dvh]">
 						<div id="spacer"></div>
 						<div id="viewport" class="absolute inset-x-0 top-0"></div>
 					</div>
@@ -106,16 +106,21 @@ import { IconDeviceTv, IconChevronDown, IconCalendarTime, IconLayoutGrid } from 
 						style="max-height: 60dvh; max-width: calc(60dvh * 16 / 9);">
 						<div
 							id="player-empty"
-							class="absolute inset-0 flex flex-col items-center justify-center gap-5 text-center px-6 pointer-events-none">
+							class="absolute inset-0 flex flex-col items-center justify-center gap-6 text-center px-6 pointer-events-none">
+							<div class="player-empty-glow" aria-hidden="true"></div>
 							<IconDeviceTv
 								aria-hidden="true"
-								stroke={0.75}
-								class="size-20 sm:size-24 lg:size-28 text-fg-3/60"
+								stroke={0.6}
+								class="size-24 sm:size-28 lg:size-36 text-fg-3/55 relative z-10"
 							/>
-							<div class="flex flex-col gap-2">
-								<p class="text-fg leading-tight tracking-[-0.02em] font-semibold"
-									style="font-size: clamp(1.25rem, 2vw + 0.75rem, 2.25rem);">
-									Pick a channel.
+							<div class="flex flex-col gap-2.5 relative z-10">
+								<span class="inline-flex items-center gap-2 self-center text-eyebrow font-semibold uppercase tracking-[0.22em] text-fg-3">
+									<span aria-hidden="true" class="size-1.5 rounded-full bg-accent shadow-[0_0_0_4px_var(--color-accent-soft)]"></span>
+									Idle
+								</span>
+								<p class="text-fg leading-[0.95] tracking-[-0.03em] font-bold"
+									style="font-size: clamp(1.75rem, 3vw + 1rem, 3.5rem);">
+									Pick a <em class="not-italic text-accent">channel</em>.
 								</p>
 								<p class="text-fg-3 text-xs sm:text-sm">
 									Choose from the list, or change category.
@@ -178,6 +183,66 @@ import { IconDeviceTv, IconChevronDown, IconCalendarTime, IconLayoutGrid } from 
 					placeholder="Search categories…"
 					clearButtonId="category-clear-search"
 				/>
+
+				<div
+					role="radiogroup"
+					aria-label="Category filter mode"
+					class="cat-mode-toggle flex p-0.5 rounded-lg border border-line bg-surface-2 text-xs shrink-0">
+					<button
+						id="category-mode-hide"
+						type="button"
+						role="radio"
+						aria-checked="true"
+						data-mode="hide"
+						class="flex-1 rounded-md px-3 py-1.5 font-medium transition-colors text-fg-2
+							hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent
+							aria-checked:bg-surface aria-checked:text-fg aria-checked:shadow-sm">
+						Hide selected
+					</button>
+					<button
+						id="category-mode-select"
+						type="button"
+						role="radio"
+						aria-checked="false"
+						data-mode="select"
+						class="flex-1 rounded-md px-3 py-1.5 font-medium transition-colors text-fg-2
+							hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent
+							aria-checked:bg-surface aria-checked:text-fg aria-checked:shadow-sm">
+						Show only selected
+					</button>
+				</div>
+
+				<div
+					id="category-select-actions"
+					hidden
+					class="flex flex-wrap items-center gap-2 text-xs shrink-0">
+					<button
+						id="category-show-selected"
+						type="button"
+						aria-pressed="false"
+						class="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 text-fg-2
+							hover:text-fg hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent
+							aria-pressed:bg-accent-soft aria-pressed:text-fg aria-pressed:border-accent">
+						<span class="cat-show-selected-box inline-flex size-3.5 items-center justify-center rounded-sm border border-fg-3 transition-colors">
+							<svg class="cat-show-selected-tick" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="10" height="10"><polyline points="20 6 9 17 4 12"/></svg>
+						</span>
+						Show selected only
+					</button>
+					<span class="ml-auto inline-flex items-center gap-3">
+						<button
+							id="category-select-all"
+							type="button"
+							class="text-accent hover:underline focus-visible:underline focus-visible:outline-none">
+							Select all visible
+						</button>
+						<button
+							id="category-select-clear"
+							type="button"
+							class="text-fg-3 hover:text-fg focus-visible:text-fg focus-visible:outline-none">
+							Clear
+						</button>
+					</span>
+				</div>
 
 				<div
 					id="category-list"

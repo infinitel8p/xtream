@@ -48,5 +48,5 @@ body:
     attributes:
       label: Confirmation
       options:
-        - label: I searched [existing issues and discussions](https://github.com/infinitel8p/xtream/issues?q=) and didn't find a duplicate.
+        - label: I searched [existing issues and discussions](https://github.com/infinitel8p/Extreme-InfiniTV/issues?q=) and didn't find a duplicate.
           required: true

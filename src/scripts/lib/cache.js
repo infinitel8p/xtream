@@ -1,176 +1,216 @@
+// IndexedDB-backed catalog cache with in-memory hydration layer
+
 const PREFIX = "xt_cache:"
-const META_KEY = "xt_cache_meta"
+const DB_NAME = "xt_cache"
+const DB_VERSION = 1
+const STORE = "entries"
+const META_LS_KEY = "xt_cache_meta" // legacy; kept only for clean-up.
 
 const makeKey = (entryId, kind) => `${PREFIX}${entryId}:${kind}`
 
-function readHot(key) {
+// ---------------------------------------------------------------------------
+// In-memory layer
+// ---------------------------------------------------------------------------
+/** @type {Map<string, { data: any, fetchedAt: number, ttl: number }>} */
+const _mem = new Map()
+
+// ---------------------------------------------------------------------------
+// IndexedDB layer
+// ---------------------------------------------------------------------------
+/** @type {Promise<IDBDatabase>|null} */
+let _dbPromise = null
+
+function openDB() {
+  if (_dbPromise) return _dbPromise
+  if (typeof indexedDB === "undefined") {
+    _dbPromise = Promise.reject(new Error("IndexedDB unavailable"))
+    return _dbPromise
+  }
+  _dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION)
+    req.onupgradeneeded = () => {
+      const db = req.result
+      if (!db.objectStoreNames.contains(STORE)) {
+        db.createObjectStore(STORE)
+      }
+    }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror = () => reject(req.error)
+    req.onblocked = () => reject(new Error("IDB blocked"))
+  })
+  return _dbPromise
+}
+
+async function idbGet(key) {
   try {
-    const raw = sessionStorage.getItem(key)
-    return raw ? JSON.parse(raw) : null
+    const db = await openDB()
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readonly")
+      const req = tx.objectStore(STORE).get(key)
+      req.onsuccess = () => resolve(req.result || null)
+      req.onerror = () => reject(req.error)
+    })
   } catch {
     return null
   }
 }
-function writeHot(key, payload) {
-  try {
-    sessionStorage.setItem(key, payload)
-  } catch {}
-}
-function dropHot(key) {
-  try {
-    sessionStorage.removeItem(key)
-  } catch {}
-}
 
-function readMeta() {
+async function idbPut(key, value) {
   try {
-    return JSON.parse(localStorage.getItem(META_KEY) || "{}")
+    const db = await openDB()
+    return await new Promise((resolve) => {
+      const tx = db.transaction(STORE, "readwrite")
+      tx.objectStore(STORE).put(value, key)
+      tx.oncomplete = () => resolve(true)
+      tx.onerror = () => resolve(false)
+      tx.onabort = () => resolve(false)
+    })
   } catch {
-    return {}
+    return false
   }
 }
-function writeMeta(meta) {
+
+async function idbDelete(key) {
   try {
-    localStorage.setItem(META_KEY, JSON.stringify(meta))
-  } catch {}
-}
-
-function evictOldestBatch(batchSize) {
-  const meta = readMeta()
-  const entries = Object.entries(meta)
-  if (entries.length === 0) return 0
-  entries.sort((a, b) => a[1] - b[1])
-  const drop = entries.slice(0, Math.min(batchSize, entries.length))
-  for (const [k] of drop) {
-    try {
-      localStorage.removeItem(k)
-    } catch {}
-    delete meta[k]
+    const db = await openDB()
+    return await new Promise((resolve) => {
+      const tx = db.transaction(STORE, "readwrite")
+      tx.objectStore(STORE).delete(key)
+      tx.oncomplete = () => resolve(true)
+      tx.onerror = () => resolve(false)
+    })
+  } catch {
+    return false
   }
-  writeMeta(meta)
-  return drop.length
 }
 
-const TRIM_TOAST_THRESHOLD_MS = 1000
-let trimToastEl = null
-
-function showTrimToast() {
-  if (typeof document === "undefined" || !document.body) return
-  if (trimToastEl) return
-  const el = document.createElement("div")
-  el.setAttribute("role", "status")
-  el.setAttribute("aria-live", "polite")
-  el.textContent = "Trimming local cache…"
-  el.style.cssText = [
-    "position:fixed",
-    "right:max(0.75rem,env(safe-area-inset-right))",
-    "bottom:max(0.75rem,env(safe-area-inset-bottom))",
-    "z-index:9999",
-    "padding:0.5rem 0.875rem",
-    "border-radius:0.75rem",
-    "background:var(--xt-surface,#1b1b22)",
-    "color:var(--xt-fg,#e7e7ea)",
-    "border:1px solid var(--xt-line,rgba(255,255,255,0.08))",
-    "font-size:0.8125rem",
-    "box-shadow:0 8px 24px rgba(0,0,0,0.32)",
-    "pointer-events:none",
-  ].join(";")
-  document.body.appendChild(el)
-  trimToastEl = el
-}
-
-function hideTrimToast() {
-  if (trimToastEl && trimToastEl.parentNode) {
-    trimToastEl.parentNode.removeChild(trimToastEl)
+async function idbAllKeys() {
+  try {
+    const db = await openDB()
+    return await new Promise((resolve) => {
+      const tx = db.transaction(STORE, "readonly")
+      const req = tx.objectStore(STORE).getAllKeys()
+      req.onsuccess = () => resolve(req.result || [])
+      req.onerror = () => resolve([])
+    })
+  } catch {
+    return []
   }
-  trimToastEl = null
 }
+
+async function idbDeleteWhere(prefix) {
+  try {
+    const db = await openDB()
+    const keys = await idbAllKeys()
+    return await new Promise((resolve) => {
+      const tx = db.transaction(STORE, "readwrite")
+      const store = tx.objectStore(STORE)
+      let removed = 0
+      for (const k of keys) {
+        if (typeof k === "string" && k.startsWith(prefix)) {
+          store.delete(k)
+          removed++
+        }
+      }
+      tx.oncomplete = () => resolve(removed)
+      tx.onerror = () => resolve(removed)
+    })
+  } catch {
+    return 0
+  }
+}
+
+async function idbClearAll() {
+  try {
+    const db = await openDB()
+    return await new Promise((resolve) => {
+      const tx = db.transaction(STORE, "readwrite")
+      tx.objectStore(STORE).clear()
+      tx.oncomplete = () => resolve(true)
+      tx.onerror = () => resolve(false)
+    })
+  } catch {
+    return false
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hydration
+// ---------------------------------------------------------------------------
+/** @type {Map<string, Promise<void>>} */
+const _hydrating = new Map()
+
+export async function hydrate(entryId, kind) {
+  if (!entryId) return
+  const key = makeKey(entryId, kind)
+  if (_mem.has(key)) return
+  if (_hydrating.has(key)) return _hydrating.get(key)
+  const p = (async () => {
+    const obj = await idbGet(key)
+    if (obj && typeof obj === "object" && "data" in obj) {
+      const age = Date.now() - obj.fetchedAt
+      if (age <= obj.ttl) {
+        _mem.set(key, obj)
+      } else {
+        idbDelete(key)
+      }
+    }
+  })()
+  _hydrating.set(key, p)
+  try {
+    await p
+  } finally {
+    _hydrating.delete(key)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 /**
+ * Sync cache read from the in-memory map. Returns null if not hydrated.
+ * For data that might live in IDB, await hydrate() or cachedFetch() first.
+ *
  * @returns {{ data: any, fetchedAt: number, age: number } | null}
  */
 export function getCached(entryId, kind) {
   if (!entryId) return null
   const key = makeKey(entryId, kind)
-
-  // Hot tier first.
-  const hot = readHot(key)
-  if (hot) {
-    const age = Date.now() - hot.fetchedAt
-    if (age <= hot.ttl) {
-      return { data: hot.data, fetchedAt: hot.fetchedAt, age }
-    }
-    dropHot(key)
-  }
-
-  try {
-    const raw = localStorage.getItem(key)
-    if (!raw) return null
-    const obj = JSON.parse(raw)
-    const age = Date.now() - obj.fetchedAt
-    if (age > obj.ttl) return null
-    writeHot(key, raw)
-    return { data: obj.data, fetchedAt: obj.fetchedAt, age }
-  } catch {
+  const e = _mem.get(key)
+  if (!e) return null
+  const age = Date.now() - e.fetchedAt
+  if (age > e.ttl) {
+    _mem.delete(key)
+    idbDelete(key)
     return null
   }
+  return { data: e.data, fetchedAt: e.fetchedAt, age }
 }
 
 export function setCached(entryId, kind, data, ttlMs) {
   if (!entryId) return
   const key = makeKey(entryId, kind)
-  const payload = JSON.stringify({
-    data,
-    fetchedAt: Date.now(),
-    ttl: ttlMs,
-  })
-
-  let trimStartedAt = 0
-  let toastShown = false
-  const MAX_ATTEMPTS = 8
-  const BATCH = 32
-
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    try {
-      localStorage.setItem(key, payload)
-      const meta = readMeta()
-      meta[key] = Date.now()
-      writeMeta(meta)
-      writeHot(key, payload)
-      if (toastShown) hideTrimToast()
-      return
-    } catch (e) {
-      if (e && e.name === "QuotaExceededError") {
-        if (trimStartedAt === 0) trimStartedAt = Date.now()
-        if (
-          !toastShown &&
-          Date.now() - trimStartedAt > TRIM_TOAST_THRESHOLD_MS
-        ) {
-          showTrimToast()
-          toastShown = true
-        }
-        const removed = evictOldestBatch(BATCH)
-        if (removed > 0) continue
-      }
-      if (toastShown) hideTrimToast()
-      console.warn("cache write failed:", e)
-      return
-    }
-  }
-  if (toastShown) hideTrimToast()
+  const payload = { data, fetchedAt: Date.now(), ttl: ttlMs }
+  _mem.set(key, payload)
+  idbPut(key, payload).catch((e) =>
+    console.warn("[xt:cache] IDB write failed:", e)
+  )
 }
 
 /**
- * Cache-or-fetch primitive.
+ * Cache-or-fetch primitive. Hydrates from IDB first, returns cached value
+ * if fresh, otherwise runs the fetcher and persists.
  *
- * @param {string} entryId  Active playlist id.
- * @param {string} kind     "live" | "vod" | "user_info" | etc.
- * @param {number} ttlMs    How long the result stays fresh.
- * @param {() => Promise<any>} fetcher  Produces fresh data on miss.
- * @param {{ force?: boolean }} [opts]  `force: true` skips the cache read.
+ * @param {string} entryId
+ * @param {string} kind
+ * @param {number} ttlMs
+ * @param {() => Promise<any>} fetcher
+ * @param {{ force?: boolean }} [opts]
  */
 export async function cachedFetch(entryId, kind, ttlMs, fetcher, opts = {}) {
   if (!opts.force) {
+    await hydrate(entryId, kind)
     const hit = getCached(entryId, kind)
     if (hit) return { data: hit.data, fromCache: true, age: hit.age }
   }
@@ -183,46 +223,116 @@ export async function cachedFetch(entryId, kind, ttlMs, fetcher, opts = {}) {
 export function invalidateEntry(entryId) {
   if (!entryId) return
   const prefix = `${PREFIX}${entryId}:`
+  for (const k of [..._mem.keys()]) {
+    if (k.startsWith(prefix)) _mem.delete(k)
+  }
+  idbDeleteWhere(prefix).catch(() => {})
+}
+
+/** Drop one specific (entry, kind) combo. */
+export function invalidate(entryId, kind) {
+  if (!entryId) return
+  const key = makeKey(entryId, kind)
+  _mem.delete(key)
+  idbDelete(key).catch(() => {})
+}
+
+/** Newest fetchedAt across kinds for one playlist (in-memory only). */
+export function getNewestCacheTime(entryId) {
+  if (!entryId) return null
+  const prefix = `${PREFIX}${entryId}:`
+  let newest = 0
+  for (const [k, e] of _mem) {
+    if (k.startsWith(prefix) && e.fetchedAt > newest) newest = e.fetchedAt
+  }
+  return newest > 0 ? newest : null
+}
+
+export async function getNewestCacheTimeAsync(entryId) {
+  if (!entryId) return null
+  const prefix = `${PREFIX}${entryId}:`
+  const keys = await idbAllKeys()
+  let newest = 0
+  for (const k of keys) {
+    if (typeof k !== "string" || !k.startsWith(prefix)) continue
+    const v = await idbGet(k)
+    if (v?.fetchedAt && v.fetchedAt > newest) newest = v.fetchedAt
+  }
+  return newest > 0 ? newest : null
+}
+
+export async function getCacheSizeAsync() {
+  try {
+    if (
+      typeof navigator !== "undefined" &&
+      navigator.storage?.estimate
+    ) {
+      const est = await navigator.storage.estimate()
+      if (typeof est.usage === "number") return est.usage
+    }
+  } catch {}
+  // Fallback: stringify each entry. Slow on big catalogs but rare path.
+  const keys = await idbAllKeys()
+  let bytes = 0
+  for (const k of keys) {
+    if (typeof k !== "string" || !k.startsWith(PREFIX)) continue
+    const v = await idbGet(k)
+    try {
+      bytes += k.length + JSON.stringify(v).length
+    } catch {}
+  }
+  return bytes
+}
+
+export function getCacheEntryCount() {
+  let n = 0
+  for (const k of _mem.keys()) {
+    if (k.startsWith(PREFIX)) n++
+  }
+  return n
+}
+
+/**
+ * Wipe every cache entry across all playlists. Used by Settings.
+ * @returns {Promise<number>} number of entries removed
+ */
+export async function clearAll() {
+  const before = (await idbAllKeys()).filter(
+    (k) => typeof k === "string" && k.startsWith(PREFIX)
+  ).length
+  _mem.clear()
+  await idbClearAll()
+  // Clean up legacy localStorage cache entries from prior versions.
   try {
     const toRemove = []
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i)
-      if (k && k.startsWith(prefix)) toRemove.push(k)
+      if (k && (k.startsWith(PREFIX) || k === META_LS_KEY)) toRemove.push(k)
     }
     for (const k of toRemove) localStorage.removeItem(k)
-    const meta = readMeta()
-    for (const k of toRemove) delete meta[k]
-    writeMeta(meta)
   } catch {}
   try {
     const sessRemove = []
     for (let i = 0; i < sessionStorage.length; i++) {
       const k = sessionStorage.key(i)
-      if (k && k.startsWith(prefix)) sessRemove.push(k)
+      if (k && k.startsWith(PREFIX)) sessRemove.push(k)
     }
     for (const k of sessRemove) sessionStorage.removeItem(k)
   } catch {}
+  return before
 }
 
-export function getNewestCacheTime(entryId) {
-  if (!entryId) return null
-  const prefix = `${PREFIX}${entryId}:`
-  const meta = readMeta()
-  let newest = 0
-  for (const [k, t] of Object.entries(meta)) {
-    if (k.startsWith(prefix) && t > newest) newest = t
-  }
-  return newest > 0 ? newest : null
-}
-
-/** Drop one specific (entry, kind) combo. */
-export function invalidate(entryId, kind) {
-  const key = makeKey(entryId, kind)
+// ---------------------------------------------------------------------------
+// One-time cleanup of legacy localStorage entries.
+// Old versions wrote here; new code uses IDB. Free up the space.
+// ---------------------------------------------------------------------------
+;(() => {
   try {
-    localStorage.removeItem(key)
-    const meta = readMeta()
-    delete meta[key]
-    writeMeta(meta)
+    const toRemove = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && (k.startsWith(PREFIX) || k === META_LS_KEY)) toRemove.push(k)
+    }
+    for (const k of toRemove) localStorage.removeItem(k)
   } catch {}
-  dropHot(key)
-}
+})()

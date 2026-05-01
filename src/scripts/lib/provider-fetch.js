@@ -11,10 +11,7 @@ async function getTauriFetch() {
     tauriFetchPromise = import("@tauri-apps/plugin-http")
       .then((m) => m.fetch)
       .catch((e) => {
-        console.error(
-          "[xt:net] plugin-http unavailable, falling back to native fetch:",
-          e
-        )
+        console.error("[xt:net] plugin-http unavailable:", e)
         return null
       })
   }
@@ -38,11 +35,6 @@ export async function providerFetch(url, init = {}) {
   const ua = getUserAgent()
   const u = String(url).slice(0, 200)
 
-  // Native fetch (Chromium / WebView networking) is the historical baseline
-  // and works reliably across providers. Only route through plugin-http when
-  // we actually need to override the User-Agent header, since plugin-http
-  // uses Rust reqwest with a different network stack (DNS, TLS, proxy
-  // handling) that some providers reject or simply can't reach.
   if (!ua || !isTauri) {
     console.log(`[xt:net] native start`, u)
     return await nativeFetch(url, init, u)
@@ -64,7 +56,7 @@ export async function providerFetch(url, init = {}) {
   } catch (e) {
     if (init?.signal?.aborted) throw e
     console.warn(
-      "[xt:net] tauri fetch failed, retrying with native fetch:",
+      "[xt:net] tauri fetch failed, falling back to native:",
       String(e?.message || e)
     )
     return await nativeFetch(url, init, u)

@@ -2,16 +2,28 @@
 import {
   loadCreds,
   getActiveEntry,
-  fmtBase,
   buildApiUrl,
   isLikelyM3USource,
   normalize,
   debounce,
 } from "@/scripts/lib/creds.js"
 import { getCached } from "@/scripts/lib/cache.js"
-import { fetchAndMaybeGunzip } from "@/scripts/lib/network.js"
 import { providerFetch } from "@/scripts/lib/provider-fetch.js"
 import { renderProviderError } from "@/scripts/lib/provider-error.js"
+import {
+  loadProgrammes,
+  invalidateEpgPlaylist,
+  EPG_OFFSET_EVENT,
+} from "@/scripts/lib/epg-data.js"
+import { openProgrammeDialog } from "@/scripts/lib/programme-dialog.js"
+import {
+  ensureLoaded as ensurePrefsLoaded,
+  getFavorites,
+  getRecents,
+} from "@/scripts/lib/preferences.js"
+
+const CAT_FAVORITES = "__favorites__"
+const CAT_RECENTS = "__recents__"
 
 const PX_PER_HOUR = 200
 const HOURS_VISIBLE = 6
@@ -28,6 +40,7 @@ const headerInner = document.getElementById("epg-time-header-inner")
 const bodyEl = document.getElementById("epg-body")
 const titleEl = document.getElementById("epg-title")
 const refreshBtn = document.getElementById("epg-refresh")
+const nowBtn = document.getElementById("epg-now")
 const categoryLabelEl = document.getElementById("epg-category-label")
 const categoryListEl = document.getElementById("epg-category-list")
 const categoryListStatus = document.getElementById("epg-category-list-status")
@@ -60,16 +73,155 @@ function setStatus(text) {
 
 function showStatus(text) {
   if (statusEl) {
+    statusEl.classList.remove("hidden", "epg-status-skeleton")
+    statusEl.classList.add("epg-status-text")
     statusEl.textContent = text
-    statusEl.classList.remove("hidden")
   }
   if (gridEl) gridEl.classList.add("hidden")
 }
 
+function showLoadingSkeleton(label = "Loading your TV schedule") {
+  if (!statusEl) return
+  statusEl.classList.remove("hidden", "epg-status-text")
+  statusEl.classList.add("epg-status-skeleton")
+  statusEl.textContent = ""
+  if (gridEl) gridEl.classList.add("hidden")
+  renderEpgSkeletonInto(statusEl, label)
+}
+
+function renderEpgSkeletonInto(target, label) {
+  const HOURS = 6
+  const HEADER_H = 40
+  const ROW_H = 64
+  const CHANNEL_W = 240
+  const HOUR_W = 200
+  // Calculate rows needed to fill the viewport. Falls back to a generous
+  // default for hidden/zero-height containers (initial paint, TV).
+  const viewportH =
+    typeof window !== "undefined" ? window.innerHeight || 720 : 720
+  const targetH = Math.max(target.clientHeight || 0, viewportH * 0.85)
+  const ROWS = Math.max(12, Math.ceil(targetH / ROW_H) + 4)
+
+  // Repeatable but uneven programme widths so the grid breathes.
+  const PROGRAMME_PATTERNS = [
+    [180, 240, 320, 280, 220],
+    [120, 360, 200, 280, 240],
+    [220, 180, 300, 240, 260],
+    [400, 200, 180, 320, 100],
+    [240, 220, 160, 380, 200],
+    [160, 280, 220, 240, 300],
+    [320, 200, 280, 180, 220],
+    [200, 240, 300, 160, 300],
+    [180, 220, 260, 320, 220],
+    [240, 180, 220, 280, 280],
+  ]
+
+  const root = document.createElement("div")
+  root.className = "epg-sk"
+  root.setAttribute("aria-busy", "true")
+  root.setAttribute("aria-label", label)
+
+  // Status chip (top-right). Breathing dots, no spinner.
+  const chip = document.createElement("div")
+  chip.className = "epg-sk-chip"
+  chip.innerHTML =
+    `<span class="epg-sk-chip-dots" aria-hidden="true"><span></span><span></span><span></span></span>` +
+    `<span>${label}</span>`
+  root.appendChild(chip)
+
+  // Time header strip - matches the real grid's tick rhythm.
+  const header = document.createElement("div")
+  header.className = "epg-sk-head"
+  header.style.setProperty("--ch", `${CHANNEL_W}px`)
+  header.style.setProperty("--h", `${HEADER_H}px`)
+  const headerTrack = document.createElement("div")
+  headerTrack.className = "epg-sk-head-track"
+  headerTrack.style.width = `${HOURS * HOUR_W}px`
+  for (let i = 0; i <= HOURS * 2; i++) {
+    const tick = document.createElement("span")
+    tick.className = i % 2 === 0 ? "epg-sk-tick epg-sk-tick--hour" : "epg-sk-tick"
+    tick.style.left = `${i * (HOUR_W / 2)}px`
+    headerTrack.appendChild(tick)
+    if (i % 2 === 0 && i < HOURS * 2) {
+      const lbl = document.createElement("span")
+      lbl.className = "skel epg-sk-tick-label"
+      lbl.style.left = `${i * (HOUR_W / 2) + 8}px`
+      headerTrack.appendChild(lbl)
+    }
+  }
+  header.appendChild(headerTrack)
+  root.appendChild(header)
+
+  // Body rows - structural mirror of the real grid.
+  const body = document.createElement("div")
+  body.className = "epg-sk-body"
+  body.style.setProperty("--row", `${ROW_H}px`)
+  body.style.setProperty("--ch", `${CHANNEL_W}px`)
+  for (let r = 0; r < ROWS; r++) {
+    const row = document.createElement("div")
+    row.className = "epg-sk-row"
+    row.style.setProperty("--delay", `${r * 60}ms`)
+    // Wave shimmer travels diagonally down + right across the grid.
+    const rowWave = (r * 130) % 1600
+
+    const info = document.createElement("div")
+    info.className = "epg-sk-info"
+    const logo = document.createElement("div")
+    logo.className = "skel epg-sk-logo"
+    logo.style.setProperty("--skel-delay", `${rowWave}ms`)
+    info.appendChild(logo)
+    const meta = document.createElement("div")
+    meta.className = "epg-sk-meta"
+    const name = document.createElement("div")
+    name.className = "skel epg-sk-line"
+    name.style.width = `${56 + ((r * 9) % 30)}%`
+    name.style.setProperty("--skel-delay", `${rowWave + 80}ms`)
+    const sub = document.createElement("div")
+    sub.className = "skel epg-sk-line epg-sk-line--sub"
+    sub.style.width = `${28 + ((r * 7) % 24)}%`
+    sub.style.setProperty("--skel-delay", `${rowWave + 160}ms`)
+    meta.append(name, sub)
+    info.appendChild(meta)
+    row.appendChild(info)
+
+    const track = document.createElement("div")
+    track.className = "epg-sk-track"
+    track.style.width = `${HOURS * HOUR_W}px`
+    let cursor = -((r * 47) % 80) // small negative offset so blocks don't all align
+    const widths = PROGRAMME_PATTERNS[r % PROGRAMME_PATTERNS.length]
+    let cellIdx = 0
+    for (const w of widths) {
+      const cell = document.createElement("div")
+      cell.className = "skel epg-sk-cell"
+      cell.style.left = `${Math.max(0, cursor)}px`
+      const visW = Math.min(w, HOURS * HOUR_W - Math.max(0, cursor))
+      if (visW <= 24) break
+      cell.style.width = `${visW}px`
+      // Each cell trails the row's lead by ~120ms
+      cell.style.setProperty("--skel-delay", `${(rowWave + 240 + cellIdx * 120) % 1600}ms`)
+      track.appendChild(cell)
+      cursor += w + 4
+      cellIdx++
+      if (cursor >= HOURS * HOUR_W) break
+    }
+    row.appendChild(track)
+    body.appendChild(row)
+  }
+  root.appendChild(body)
+
+  // Now-line accent - quiet fuchsia hint about a third in.
+  const now = document.createElement("div")
+  now.className = "epg-sk-now"
+  now.style.left = `${CHANNEL_W + HOUR_W * 1.8}px`
+  root.appendChild(now)
+
+  target.replaceChildren(root)
+}
+
 function showProviderError(kind) {
   if (statusEl) {
+    statusEl.classList.remove("hidden", "epg-status-skeleton", "epg-status-text")
     statusEl.textContent = ""
-    statusEl.classList.remove("hidden")
     renderProviderError(statusEl, {
       providerName: activePlaylistTitle,
       kind,
@@ -80,70 +232,12 @@ function showProviderError(kind) {
 }
 
 function hideStatus() {
-  if (statusEl) statusEl.classList.add("hidden")
+  if (statusEl) {
+    statusEl.classList.add("hidden")
+    statusEl.classList.remove("epg-status-skeleton", "epg-status-text")
+    statusEl.textContent = ""
+  }
   if (gridEl) gridEl.classList.remove("hidden")
-}
-
-// ----------------------------
-// XMLTV parsing
-// ----------------------------
-function parseXmlTvDate(s) {
-  if (!s) return 0
-  const trimmed = s.trim()
-  // 14 digits, optional space + signed 4-digit offset.
-  const m = trimmed.match(
-    /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(?:\s*([+-])(\d{2})(\d{2}))?$/
-  )
-  if (!m) return 0
-  const [, y, mo, d, h, mi, s2, sign, oh, om] = m
-  const utc = Date.UTC(+y, +mo - 1, +d, +h, +mi, +s2)
-  if (!sign) return utc
-  const offsetMs = (parseInt(oh, 10) * 60 + parseInt(om, 10)) * 60 * 1000
-  return sign === "+" ? utc - offsetMs : utc + offsetMs
-}
-
-function parseXmlTv(xml) {
-  programmes.clear()
-  const doc = new DOMParser().parseFromString(xml, "text/xml")
-  const err = doc.querySelector("parsererror")
-  if (err) throw new Error("XMLTV parse error: " + err.textContent.slice(0, 200))
-
-  const lo = Date.now() - 60 * 60 * 1000
-  const hi = Date.now() + 24 * 60 * 60 * 1000
-
-  const list = doc.querySelectorAll("programme")
-  for (const p of list) {
-    const ch = (p.getAttribute("channel") || "").toLowerCase()
-    if (!ch) continue
-    const start = parseXmlTvDate(p.getAttribute("start") || "")
-    const stop = parseXmlTvDate(p.getAttribute("stop") || "")
-    if (!start || !stop || stop <= start) continue
-    if (stop < lo || start > hi) continue
-
-    const title =
-      p.querySelector("title")?.textContent?.trim() || "Untitled"
-    const desc = p.querySelector("desc")?.textContent?.trim() || ""
-
-    let arr = programmes.get(ch)
-    if (!arr) {
-      arr = []
-      programmes.set(ch, arr)
-    }
-    arr.push({ start, stop, title, desc })
-  }
-
-  for (const arr of programmes.values()) {
-    arr.sort((a, b) => a.start - b.start)
-    let lastStop = -Infinity
-    let writeIdx = 0
-    for (let i = 0; i < arr.length; i++) {
-      if (arr[i].start >= lastStop) {
-        arr[writeIdx++] = arr[i]
-        lastStop = arr[i].stop
-      }
-    }
-    arr.length = writeIdx
-  }
 }
 
 // ----------------------------
@@ -199,7 +293,7 @@ function renderChannelRow(channel, programmesForRow) {
 
   const logo = document.createElement("div")
   logo.className =
-    "h-9 w-9 shrink-0 rounded-md bg-surface-2 overflow-hidden ring-1 ring-inset ring-line"
+    "h-9 w-9 shrink-0 rounded-md overflow-hidden ring-1 ring-inset ring-line logo-skel"
   if (channel.logo) {
     const img = document.createElement("img")
     img.src = channel.logo
@@ -208,8 +302,17 @@ function renderChannelRow(channel, programmesForRow) {
     img.decoding = "async"
     img.referrerPolicy = "no-referrer"
     img.className = "h-full w-full object-contain"
-    img.onerror = () => img.remove()
+    img.onload = () => logo.setAttribute("data-loaded", "true")
+    img.onerror = () => {
+      img.remove()
+      logo.setAttribute("data-loaded", "true")
+    }
+    if (img.complete && img.naturalWidth > 0) {
+      logo.setAttribute("data-loaded", "true")
+    }
     logo.appendChild(img)
+  } else {
+    logo.setAttribute("data-loaded", "true")
   }
   info.appendChild(logo)
 
@@ -253,8 +356,9 @@ function renderChannelRow(channel, programmesForRow) {
     const cell = document.createElement("button")
     cell.type = "button"
     cell.className =
-      "absolute top-1 bottom-1 rounded-lg px-2 py-1 text-left outline-none " +
-      "border transition-colors overflow-hidden " +
+      "epg-cell absolute top-1 bottom-1 rounded-lg px-2 py-1 text-left outline-none " +
+      "border transition-[background-color,color,border-color,transform] duration-150 ease-out overflow-hidden " +
+      "active:scale-[0.97] " +
       (isLive
         ? "border-accent bg-accent-soft text-fg hover:bg-accent/20 focus-visible:bg-accent/20"
         : "border-line bg-surface text-fg-2 hover:bg-surface-2 hover:text-fg focus-visible:bg-surface-2 focus-visible:text-fg") +
@@ -263,7 +367,14 @@ function renderChannelRow(channel, programmesForRow) {
     cell.style.width = `${width}px`
     cell.title = `${fmtTime(p.start)}–${fmtTime(p.stop)} · ${p.title}${p.desc ? "\n\n" + p.desc : ""}`
     cell.addEventListener("click", () => {
-      window.location.href = `/livetv?channel=${encodeURIComponent(channel.id)}`
+      openProgrammeDialog({
+        title: p.title,
+        desc: p.desc,
+        start: p.start,
+        stop: p.stop,
+        channelName: channel.name,
+        channelId: channel.id,
+      })
     })
 
     const titleLine = document.createElement("div")
@@ -290,7 +401,7 @@ function renderNowLine() {
   const line = document.createElement("div")
   line.dataset.nowLine = ""
   line.className =
-    "absolute top-0 bottom-0 w-px bg-accent pointer-events-none z-20"
+    "epg-now-line absolute top-0 bottom-0 w-px bg-accent pointer-events-none z-20"
   line.style.left = `${CHANNEL_COL_WIDTH + x}px`
   bodyEl.appendChild(line)
 }
@@ -332,11 +443,25 @@ function render() {
 // Loaders
 // ----------------------------
 function pickChannels(cachedChannels) {
-  const filtered = activeCat
-    ? cachedChannels.filter((c) => (c.category || "") === activeCat)
-    : cachedChannels.slice()
+  let filtered
+  if (activeCat === CAT_FAVORITES && activePlaylistId) {
+    const favs = getFavorites(activePlaylistId, "live")
+    filtered = cachedChannels.filter((channel) => favs.has(channel.id))
+  } else if (activeCat === CAT_RECENTS && activePlaylistId) {
+    const byId = new Map(cachedChannels.map((channel) => [channel.id, channel]))
+    const recents = getRecents(activePlaylistId, "live")
+    filtered = []
+    for (const recent of recents) {
+      const channel = byId.get(recent.id)
+      if (channel) filtered.push(channel)
+    }
+  } else if (activeCat) {
+    filtered = cachedChannels.filter((channel) => (channel.category || "") === activeCat)
+  } else {
+    filtered = cachedChannels.slice()
+  }
   // Drop channels with no tvg-id - they have no EPG match in XMLTV anyway.
-  const withEpg = filtered.filter((c) => c.tvgId)
+  const withEpg = filtered.filter((channel) => channel.tvgId)
   return withEpg.slice(0, MAX_CHANNELS)
 }
 
@@ -398,30 +523,6 @@ async function fetchXtreamChannels() {
     )
 }
 
-async function loadEpgXml() {
-  if (isLikelyM3USource(creds.host, creds.user, creds.pass)) {
-    const url =
-      (() => {
-        try {
-          return localStorage.getItem(`xt_m3u_epg:${activePlaylistId}`) || ""
-        } catch {
-          return ""
-        }
-      })()
-    if (!url) {
-      throw new Error(
-        "This M3U playlist doesn't expose an EPG URL (`x-tvg-url`)."
-      )
-    }
-    return fetchAndMaybeGunzip(url)
-  }
-  const base = fmtBase(creds.host, creds.port).replace(/\/+$/, "")
-  const url =
-    `${base}/xmltv.php?username=${encodeURIComponent(creds.user)}` +
-    `&password=${encodeURIComponent(creds.pass)}`
-  return fetchAndMaybeGunzip(url)
-}
-
 // ----------------------------
 // Category picker
 // ----------------------------
@@ -467,9 +568,19 @@ function applyCategory() {
   if (!allChannels.length) return
   channels = pickChannels(allChannels)
   if (!channels.length) {
-    showStatus(
-      "No channels in this category have EPG ids (`tvg-id`). Try a different category."
-    )
+    if (activeCat === CAT_FAVORITES) {
+      showStatus(
+        "No favorite channels with EPG ids (`tvg-id`). Star a channel on Live TV first."
+      )
+    } else if (activeCat === CAT_RECENTS) {
+      showStatus(
+        "No recently watched channels with EPG ids (`tvg-id`). Play one on Live TV first."
+      )
+    } else {
+      showStatus(
+        "No channels in this category have EPG ids (`tvg-id`). Try a different category."
+      )
+    }
     return
   }
   if (!programmes.size) {
@@ -484,23 +595,24 @@ function applyCategory() {
 function renderCategoryPicker(items) {
   if (!categoryListEl) return
   const counts = new Map()
-  for (const ch of items) {
-    if (!ch.tvgId) continue
-    const k = (ch.category || "").trim() || "Uncategorized"
-    counts.set(k, (counts.get(k) || 0) + 1)
+  for (const channel of items) {
+    if (!channel.tvgId) continue
+    const key = (channel.category || "").trim() || "Uncategorized"
+    counts.set(key, (counts.get(key) || 0) + 1)
   }
   const names = Array.from(counts.keys()).sort((a, b) =>
     a.localeCompare(b, "en", { sensitivity: "base" })
   )
   const frag = document.createDocumentFragment()
 
-  const addRow = (val, label, count = null) => {
+  const addRow = (val, label, count = null, extraClass = "") => {
     const btn = document.createElement("button")
     btn.type = "button"
     btn.setAttribute("role", "option")
     btn.dataset.val = val
     btn.className =
-      "w-full py-2 px-2 text-sm flex items-center justify-between hover:bg-surface-2 focus:bg-surface-2 outline-none text-fg"
+      "w-full py-2 px-2 text-sm flex items-center justify-between hover:bg-surface-2 focus:bg-surface-2 outline-none text-fg" +
+      (extraClass ? " " + extraClass : "")
     const left = document.createElement("span")
     left.className = "truncate"
     left.textContent = label
@@ -513,6 +625,30 @@ function renderCategoryPicker(items) {
     frag.appendChild(btn)
     return btn
   }
+
+  // Favorites + Recents pseudo-rows. Only counted against channels that have a
+  // tvg-id, since the EPG grid drops the rest anyway.
+  const favSet = activePlaylistId
+    ? getFavorites(activePlaylistId, "live")
+    : new Set()
+  const recents = activePlaylistId
+    ? getRecents(activePlaylistId, "live")
+    : []
+  const favEpgCount = items.reduce(
+    (acc, channel) =>
+      channel.tvgId && favSet.has(channel.id) ? acc + 1 : acc,
+    0
+  )
+  const recentIds = new Set(recents.map((entry) => entry.id))
+  const recEpgCount = items.reduce(
+    (acc, channel) =>
+      channel.tvgId && recentIds.has(channel.id) ? acc + 1 : acc,
+    0
+  )
+  const favRow = addRow(CAT_FAVORITES, "★ Favorites", favEpgCount, "text-accent")
+  if (favEpgCount === 0) favRow.style.display = "none"
+  const recRow = addRow(CAT_RECENTS, "🕒 Recently watched", recEpgCount)
+  if (recEpgCount === 0) recRow.style.display = "none"
 
   addRow("", "All categories")
   for (const name of names) addRow(name, name, counts.get(name))
@@ -547,7 +683,7 @@ function filterCategories() {
 categorySearchEl?.addEventListener("input", debounce(filterCategories, 120))
 
 async function init() {
-  showStatus("Loading…")
+  showLoadingSkeleton("Loading your TV schedule")
 
   creds = await loadCreds()
   if (!creds.host) {
@@ -562,14 +698,12 @@ async function init() {
   }
   activePlaylistId = active._id
   activePlaylistTitle = active.title || ""
+  await ensurePrefsLoaded()
   try {
     activeCat = localStorage.getItem("xt_active_cat") || ""
   } catch {
     activeCat = ""
   }
-  const isSentinelCat =
-    activeCat === "__favorites__" || activeCat === "__recents__"
-  if (isSentinelCat) activeCat = ""
   syncCategoryUI()
 
   const isM3U = isLikelyM3USource(creds.host, creds.user, creds.pass)
@@ -583,7 +717,7 @@ async function init() {
       )
       return
     }
-    showStatus("Loading channels…")
+    showLoadingSkeleton("Loading channels")
     try {
       cached = await fetchXtreamChannels()
     } catch (e) {
@@ -598,9 +732,19 @@ async function init() {
 
   channels = pickChannels(cached)
   if (!channels.length) {
-    showStatus(
-      "No channels in this category have EPG ids (`tvg-id`). Try a different category."
-    )
+    if (activeCat === CAT_FAVORITES) {
+      showStatus(
+        "No favorite channels with EPG ids (`tvg-id`). Star a channel on Live TV first."
+      )
+    } else if (activeCat === CAT_RECENTS) {
+      showStatus(
+        "No recently watched channels with EPG ids (`tvg-id`). Play one on Live TV first."
+      )
+    } else {
+      showStatus(
+        "No channels in this category have EPG ids (`tvg-id`). Try a different category."
+      )
+    }
     return
   }
 
@@ -611,11 +755,13 @@ async function init() {
 
   viewStart = roundHalfHourFloor(Date.now() - 30 * 60 * 1000)
 
-  showStatus("Loading EPG (this can take a moment for large providers)…")
+  showLoadingSkeleton("Loading EPG · large providers can take a moment")
 
+  programmes.clear()
   try {
-    const xml = await loadEpgXml()
-    parseXmlTv(xml)
+    const state = await loadProgrammes(activePlaylistId, creds, { force: true })
+    if (!state) throw new Error("EPG fetch failed")
+    for (const [k, v] of state.programmes) programmes.set(k, v)
   } catch (e) {
     console.error("[epg] load failed:", e)
     showProviderError("EPG")
@@ -633,6 +779,31 @@ async function init() {
 }
 
 refreshBtn?.addEventListener("click", () => {
+  if (activePlaylistId) invalidateEpgPlaylist(activePlaylistId)
+  programmes.clear()
+  init()
+})
+
+nowBtn?.addEventListener("click", () => {
+  if (!gridEl) return
+  viewStart = roundHalfHourFloor(Date.now() - 30 * 60 * 1000)
+  if (programmes.size && channels.length) render()
+  // Centre the now-line about a third in from the left of the visible width.
+  const visible = gridEl.clientWidth || 0
+  const target = Math.max(
+    0,
+    CHANNEL_COL_WIDTH + timeToX(Date.now()) - Math.max(120, visible / 3)
+  )
+  try {
+    gridEl.scrollTo({ left: target, behavior: "smooth" })
+  } catch {
+    gridEl.scrollLeft = target
+  }
+})
+
+document.addEventListener(EPG_OFFSET_EVENT, (e) => {
+  const detail = /** @type {CustomEvent} */ (e).detail
+  if (!detail || detail.playlistId !== activePlaylistId) return
   programmes.clear()
   init()
 })
@@ -649,12 +820,26 @@ document.addEventListener("xt:active-changed", () => {
 
 document.addEventListener("xt:cat-changed", (e) => {
   const next = /** @type {CustomEvent} */ (e).detail || ""
-  const cleaned =
-    next === "__favorites__" || next === "__recents__" ? "" : next
-  if (cleaned === activeCat) return
-  activeCat = cleaned
+  if (next === activeCat) return
+  activeCat = next
   syncCategoryUI()
   applyCategory()
+})
+
+document.addEventListener("xt:favorites-changed", (e) => {
+  const detail = /** @type {CustomEvent} */ (e).detail
+  if (!detail || detail.playlistId !== activePlaylistId) return
+  if (detail.kind !== "live") return
+  if (allChannels.length) renderCategoryPicker(allChannels)
+  if (activeCat === CAT_FAVORITES) applyCategory()
+})
+
+document.addEventListener("xt:recents-changed", (e) => {
+  const detail = /** @type {CustomEvent} */ (e).detail
+  if (!detail || detail.playlistId !== activePlaylistId) return
+  if (detail.kind !== "live") return
+  if (allChannels.length) renderCategoryPicker(allChannels)
+  if (activeCat === CAT_RECENTS) applyCategory()
 })
 
 categoryDialog?.addEventListener("close", () => {

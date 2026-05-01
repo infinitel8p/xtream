@@ -32,13 +32,23 @@ try {
     process.exit(1)
 }
 
-// Extract version number from filename (xtream_0.2.2_x64-setup.exe → 0.2.2)
-const versionMatch = installerFile.match(/xtream_(\d+\.\d+\.\d+)_x64-setup\.exe/)
+// Extract version number. Tauri's NSIS bundle names files as
+// "<productName>_<version>_x64-setup.exe". After the productName rename
+// from "xtream" to "Extreme InfiniTV", the historic prefix may still appear
+// for older artifacts, so accept any prefix and just pull the version.
+const versionMatch = installerFile.match(/_(\d+\.\d+\.\d+)_x64-setup\.exe$/)
 if (!versionMatch) {
     console.error("❌ Could not parse version from filename:", installerFile)
     process.exit(1)
 }
 const version = versionMatch[1]
+
+// GitHub Releases URL-encodes spaces in artifact filenames as %20. Encode
+// the filename component (but leave the URL slashes alone) so the updater
+// can reach files like "Extreme InfiniTV_1.2.0_x64-setup.exe".
+const downloadUrl =
+    `https://github.com/infinitel8p/Extreme-InfiniTV/releases/download/v${version}/` +
+    encodeURIComponent(installerFile)
 
 // Build JSON structure
 const latest = {
@@ -47,7 +57,7 @@ const latest = {
     pub_date: new Date().toISOString(),
     platforms: {
         "windows-x86_64": {
-            url: `https://github.com/infinitel8p/xtream/releases/download/v${version}/${installerFile}`,
+            url: downloadUrl,
             signature
         }
     }

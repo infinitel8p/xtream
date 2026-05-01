@@ -11,6 +11,10 @@ import {
   isFavorite,
   toggleFavorite,
   pushRecent,
+  getProgress,
+  setProgress,
+  markCompleted,
+  clearProgress,
 } from "@/scripts/lib/preferences.js"
 import { providerFetch } from "@/scripts/lib/provider-fetch.js"
 import {
@@ -32,6 +36,8 @@ import {
   chooseMime,
 } from "@/scripts/lib/morph-detail.js"
 import { attachPlayerFocusKeeper } from "@/scripts/lib/player-focus-keeper.js"
+import { fmtImdbRating } from "@/scripts/lib/format.js"
+import { setRichPresence, clearRichPresence } from "@/scripts/lib/discord-rpc.js"
 
 const VOD_INFO_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -45,6 +51,9 @@ const plotEl = document.getElementById("movie-detail-plot")
 const posterEl = document.getElementById("movie-detail-poster")
 const playerWrap = document.getElementById("movie-detail-player-wrap")
 const playBtn = document.getElementById("movie-detail-play")
+const playLabelEl = document.getElementById("movie-detail-play-label")
+const playSubEl = document.getElementById("movie-detail-play-sub")
+const restartBtn = document.getElementById("movie-detail-restart")
 const favBtn = document.getElementById("movie-detail-fav")
 const downloadBtn = document.getElementById("movie-detail-download")
 const downloadLabel = document.getElementById("movie-detail-download-label")
@@ -141,14 +150,33 @@ function applyVodInfo(data) {
 
   if (metaEl) {
     const bits = []
-    if (year) bits.push(String(year))
+    if (year) bits.push(`<span>${String(year)}</span>`)
     const humanDur = fmtDuration(duration)
-    if (humanDur) bits.push(humanDur)
-    if (genre) bits.push(genre)
-    if (rating) bits.push(`Rating: ${String(rating).slice(0, 4)}`)
-    metaEl.textContent = bits.join(" • ")
+    if (humanDur) bits.push(`<span>${humanDur}</span>`)
+    if (genre) bits.push(`<span>${escapeText(genre)}</span>`)
+    const ratingText = fmtImdbRating(rating)
+    if (ratingText) {
+      bits.push(
+        '<span class="inline-flex items-center gap-1 text-fg-2" aria-label="IMDB rating ' +
+          ratingText +
+          ' out of 10">' +
+          '<svg viewBox="0 0 24 24" width="0.95em" height="0.95em" fill="currentColor" aria-hidden="true" class="text-accent">' +
+          '<path d="M12 17.75l-6.18 3.25 1.18-6.88L2 9.25l6.91-1L12 2l3.09 6.25 6.91 1-5 4.87 1.18 6.88z"/>' +
+          "</svg>" +
+          `<span class="font-medium tabular-nums">${ratingText}</span>` +
+          '<span class="text-fg-3">/10</span>' +
+          "</span>"
+      )
+    }
+    metaEl.innerHTML = bits.join(' <span aria-hidden="true">·</span> ')
   }
   if (plotEl) plotEl.textContent = plot || "No description available."
+}
+
+function escapeText(text) {
+  const div = document.createElement("div")
+  div.textContent = String(text)
+  return div.innerHTML
 }
 
 function syncFavButton() {
@@ -159,10 +187,44 @@ function syncFavButton() {
   favBtn.setAttribute("aria-pressed", String(fav))
 }
 
+function fmtClock(seconds) {
+  const s = Math.max(0, Math.floor(Number(seconds) || 0))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const ss = s % 60
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}`
+  return `${m}:${String(ss).padStart(2, "0")}`
+}
+
+function syncResumeUI() {
+  if (!playBtn || !movie) return
+  const saved = activePlaylistId
+    ? getProgress(activePlaylistId, "vod", movie.id)
+    : null
+  const canResume =
+    saved && !saved.completed && saved.position > RESUME_MIN_SECONDS
+  if (canResume) {
+    if (playLabelEl) playLabelEl.textContent = "Continue"
+    if (playSubEl) playSubEl.textContent = `from ${fmtClock(saved.position)}`
+    playBtn.setAttribute("aria-label", `Continue watching from ${fmtClock(saved.position)}`)
+    if (restartBtn) restartBtn.removeAttribute("hidden")
+  } else {
+    if (playLabelEl) playLabelEl.textContent = "Play"
+    if (playSubEl) playSubEl.textContent = ""
+    playBtn.setAttribute("aria-label", "Play")
+    if (restartBtn) restartBtn.setAttribute("hidden", "")
+  }
+}
+
 // ----------------------------
 // Playback
 // ----------------------------
 let vjs = null
+let progressListenersBound = false
+const RESUME_MIN_SECONDS = 30
+const RESUME_MAX_FRACTION = 0.95
+const PROGRESS_WRITE_INTERVAL_MS = 5000
+
 async function ensurePlayer() {
   if (vjs) return vjs
   const [{ default: videojs }] = await Promise.all([
@@ -180,6 +242,8 @@ async function ensurePlayer() {
       volumePanel: { inline: false },
       pictureInPictureToggle: !hasNativePipBridge,
       playbackRateMenuButton: true,
+      subsCapsButton: true,
+      audioTrackButton: true,
       fullscreenToggle: true,
     },
     html5: {
@@ -231,20 +295,96 @@ async function startPlayback() {
       src: playSrc,
     })
   })
+
+  const saved = activePlaylistId
+    ? getProgress(activePlaylistId, "vod", movie.id)
+    : null
+  if (saved && !saved.completed && saved.position > RESUME_MIN_SECONDS) {
+    player.one("loadedmetadata", () => {
+      const dur = player.duration() || saved.duration || 0
+      const pos = saved.position
+      if (dur === 0 || pos / dur < RESUME_MAX_FRACTION) {
+        try { player.currentTime(pos) } catch {}
+      }
+    })
+  }
+
   player.src({ src: playSrc, type: mime })
+
+  if (!progressListenersBound) {
+    progressListenersBound = true
+    let lastWriteAt = 0
+    player.on("timeupdate", () => {
+      if (!activePlaylistId || !movie) return
+      const now = Date.now()
+      if (now - lastWriteAt < PROGRESS_WRITE_INTERVAL_MS) return
+      const pos = player.currentTime() || 0
+      const dur = player.duration() || 0
+      if (pos < 1) return
+      lastWriteAt = now
+      setProgress(activePlaylistId, "vod", movie.id, pos, dur, {
+        name: movie.name,
+        logo: movie.logo || null,
+      })
+    })
+    player.on("ended", () => {
+      if (!activePlaylistId || !movie) return
+      const dur = player.duration() || 0
+      markCompleted(activePlaylistId, "vod", movie.id, { duration: dur })
+    })
+  }
+
   player.play().catch((err) =>
     console.warn("[xt:movie-detail] play() rejected:", err?.message || err)
   )
+
+  if (activePlaylistId && movie) {
+    setRichPresence({
+      playlistId: activePlaylistId,
+      details: movie.name || "Watching a movie",
+      state: movie.year ? `Released ${movie.year}` : "Movie",
+      largeImage: movie.logo || "logo",
+      largeText: movie.name || "Extreme InfiniTV",
+      smallImage: "movie",
+      smallText: "Movie",
+      startTimestamp: Date.now(),
+    })
+  }
 }
 
 playBtn?.addEventListener("click", startPlayback)
 
+restartBtn?.addEventListener("click", () => {
+  if (!movie || !activePlaylistId) return
+  clearProgress(activePlaylistId, "vod", movie.id)
+  startPlayback()
+})
+
+document.addEventListener("xt:progress-changed", (e) => {
+  const detail = e.detail
+  if (!detail || detail.playlistId !== activePlaylistId) return
+  if (detail.kind !== "vod") return
+  if (movie?.id !== detail.id) return
+  syncResumeUI()
+})
+
 window.addEventListener("pagehide", () => {
   try {
+    if (activePlaylistId && movie && vjs) {
+      const pos = vjs.currentTime?.() || 0
+      const dur = vjs.duration?.() || 0
+      if (pos > 1) {
+        setProgress(activePlaylistId, "vod", movie.id, pos, dur, {
+          name: movie.name,
+          logo: movie.logo || null,
+        })
+      }
+    }
     vjs?.pause?.()
     vjs?.dispose?.()
   } catch {}
   clearAmbient(ambientEl)
+  clearRichPresence().catch(() => {})
 })
 
 // ----------------------------
@@ -252,7 +392,10 @@ window.addEventListener("pagehide", () => {
 // ----------------------------
 favBtn?.addEventListener("click", () => {
   if (!movie || !activePlaylistId) return
-  toggleFavorite(activePlaylistId, "vod", movie.id)
+  toggleFavorite(activePlaylistId, "vod", movie.id, {
+    name: movie.name || movie.title || "",
+    logo: movie.logo || movie.cover || movie.stream_icon || null,
+  })
 })
 
 document.addEventListener("xt:favorites-changed", (e) => {
@@ -428,6 +571,7 @@ async function boot() {
   paintPoster(movie.name, movie.logo || null)
   setAmbient(movie.logo || null)
   syncFavButton()
+  syncResumeUI()
 
   if (dl?.url) {
     detailSrc = dl.url

@@ -1,5 +1,8 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import ContinueWatching from "@/components/ContinueWatching.svelte";
+import FavoritesStrip from "@/components/FavoritesStrip.svelte";
+import RecentlyAddedStrip from "@/components/RecentlyAddedStrip.svelte";
 import {
 	IconDeviceTv,
 	IconMovie,
@@ -29,50 +32,46 @@ import {
 	</script>
 
 	<main
-		class="flex-1 w-full mx-auto px-4 py-6 md:px-6 lg:px-8 max-w-7xl flex flex-col">
+		class="flex-1 w-full mx-auto px-4 py-6 md:px-6 lg:px-8 max-w-480 flex flex-col gap-6">
+
 		<section
 			id="welcome"
 			aria-labelledby="welcome-heading"
-			class="hidden flex-1 min-h-0 items-center justify-center py-6">
-			<div
-				class="welcome-enter w-full max-w-2xl rounded-2xl border border-line bg-surface p-6 sm:p-10 lg:p-14 text-center">
-				<p
-					class="font-sans text-eyebrow font-medium uppercase tracking-wider text-fg-3 mb-5">
+			class="welcome-section hidden flex-1 min-h-0 items-center justify-center py-6">
+			<div class="welcome-enter welcome-card rounded-2xl border border-line bg-surface text-center">
+				<p class="welcome-eyebrow font-sans font-medium uppercase tracking-wider text-fg-3">
 					Welcome
 				</p>
 				<h1
 					id="welcome-heading"
-					class="font-normal text-accent tracking-[-0.01em] leading-none"
-					style="font-size: clamp(2.25rem, 4vw + 1rem, 4.25rem);">
+					class="welcome-heading font-normal text-accent tracking-[-0.005em] leading-none">
 					Pick something to watch.
 				</h1>
-				<p
-					class="mt-5 sm:mt-6 mx-auto max-w-md text-sm sm:text-base text-fg-2 font-sans tracking-tight leading-relaxed">
+				<p class="welcome-sub mx-auto text-fg-2 font-sans tracking-tight leading-relaxed">
 					Connect an IPTV subscription, or paste a playlist URL.
 					Channels, movies, and series will appear here.
 				</p>
 
-				<div
-					class="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-2.5 sm:gap-3 sm:justify-center">
+				<div class="welcome-actions flex flex-col sm:flex-row gap-2.5 sm:gap-3 sm:justify-center">
 					<a
 						id="welcome-add"
 						href="/login"
-						class="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg bg-fg text-bg text-sm font-semibold transition-opacity hover:opacity-90">
-						<IconPlus aria-hidden="true" class="h-4 w-4" />
+						class="btn-primary">
+						<IconPlus aria-hidden="true" class="btn-icon" />
 						Add a playlist
 					</a>
 					<a
 						href="/login?demo=1"
-						class="inline-flex items-center justify-center gap-2 h-11 px-5 rounded-lg border border-line bg-surface text-sm font-medium text-fg transition-colors hover:bg-surface-2 hover:border-line-soft focus-visible:bg-surface-2 focus-visible:border-accent">
+						class="btn">
 						<IconSparkles
 							aria-hidden="true"
-							class="h-4 w-4 text-accent"
+							class="btn-icon text-accent"
 						/>
 						Try a demo playlist
 					</a>
 				</div>
 
-				<p class="mt-8 text-xs text-fg-3 leading-relaxed">
+				<p class="welcome-fineprint text-fg-3 leading-relaxed">
 					This app does not provide any content. The demo loads a
 					public playlist from iptv-org.
 				</p>
@@ -82,7 +81,7 @@ import {
 		<nav
 			id="hub-tiles"
 			aria-label="Browse"
-			class="grid gap-3 sm:gap-4 flex-1 min-h-0
+			class="grid gap-3 sm:gap-4 shrink-0
 				grid-cols-1
 				landscape:grid-cols-[2fr_1fr] landscape:grid-rows-2
 				lg:grid-cols-[2fr_1fr] lg:grid-rows-2">
@@ -99,7 +98,11 @@ import {
 					focus-visible:border-accent focus-visible:bg-surface-2
 					hover:transform-[translateY(-2px)]
 					focus-visible:transform-[translateY(-2px)]">
-				<div class="flex items-start justify-between gap-4">
+				<div
+					id="livetv-tile-art"
+					class="tile-art pointer-events-none"
+					aria-hidden="true"></div>
+				<div class="relative flex items-start justify-between gap-4 z-10">
 					<IconDeviceTv
 						aria-hidden="true"
 						stroke={1}
@@ -111,7 +114,7 @@ import {
 						aria-hidden="true">
 					</p>
 				</div>
-				<div class="mt-auto pt-6">
+				<div class="relative mt-auto pt-6 z-10">
 					<h2
 						class="font-semibold tracking-[-0.02em] leading-[0.92] text-fg
 							group-hover:text-accent group-focus-visible:text-accent
@@ -119,7 +122,9 @@ import {
 						style="font-size: clamp(3rem, 6vw + 1.5rem, 8.5rem);">
 						Live TV
 					</h2>
-					<p class="mt-4 sm:mt-5 text-sm sm:text-base text-fg-2 max-w-md font-sans tracking-tight">
+					<p
+						id="livetv-tile-sub"
+						class="mt-4 sm:mt-5 text-sm sm:text-base text-fg-2 max-w-md font-sans tracking-tight truncate">
 						Channels, and what's on right now.
 					</p>
 				</div>
@@ -129,7 +134,7 @@ import {
 				href="/movies"
 				aria-label="Browse Movies"
 				style="animation-delay: 150ms;"
-				class="tile-enter group flex flex-col justify-between
+				class="tile-enter group relative overflow-hidden flex flex-col justify-between
 					rounded-2xl border border-line bg-surface
 					p-5 sm:p-6
 					min-h-28 landscape:min-h-0 lg:min-h-0
@@ -138,12 +143,16 @@ import {
 					focus-visible:border-accent focus-visible:bg-surface-2
 					hover:transform-[translateY(-2px)]
 					focus-visible:transform-[translateY(-2px)]">
+				<div
+					id="movies-tile-art"
+					class="tile-art pointer-events-none"
+					aria-hidden="true"></div>
 				<IconMovie
 					aria-hidden="true"
 					stroke={1.25}
-					class="size-9 sm:size-10 lg:size-12 text-fg-3 transition-colors duration-200 group-hover:text-accent group-focus-visible:text-accent"
+					class="relative z-10 size-9 sm:size-10 lg:size-12 text-fg-3 transition-colors duration-200 group-hover:text-accent group-focus-visible:text-accent"
 				/>
-				<div class="mt-auto pt-4">
+				<div class="relative z-10 mt-auto pt-4">
 					<h2 class="text-2xl sm:text-3xl lg:text-5xl font-semibold tracking-[-0.02em] leading-[0.95]
 						text-fg group-hover:text-accent group-focus-visible:text-accent
 						transition-colors duration-200 ms-[-0.05em]">
@@ -159,7 +168,7 @@ import {
 				href="/series"
 				aria-label="Browse Series"
 				style="animation-delay: 250ms;"
-				class="tile-enter group flex flex-col justify-between
+				class="tile-enter group relative overflow-hidden flex flex-col justify-between
 					rounded-2xl border border-line bg-surface
 					p-5 sm:p-6
 					min-h-28 landscape:min-h-0 lg:min-h-0
@@ -168,12 +177,16 @@ import {
 					focus-visible:border-accent focus-visible:bg-surface-2
 					hover:transform-[translateY(-2px)]
 					focus-visible:transform-[translateY(-2px)]">
+				<div
+					id="series-tile-art"
+					class="tile-art pointer-events-none"
+					aria-hidden="true"></div>
 				<IconStack2
 					aria-hidden="true"
 					stroke={1.25}
-					class="size-9 sm:size-10 lg:size-12 text-fg-3 transition-colors duration-200 group-hover:text-accent group-focus-visible:text-accent"
+					class="relative z-10 size-9 sm:size-10 lg:size-12 text-fg-3 transition-colors duration-200 group-hover:text-accent group-focus-visible:text-accent"
 				/>
-				<div class="mt-auto pt-4">
+				<div class="relative z-10 mt-auto pt-4">
 					<h2 class="text-2xl sm:text-3xl lg:text-5xl font-semibold tracking-[-0.02em] leading-[0.95]
 						text-fg group-hover:text-accent group-focus-visible:text-accent
 						transition-colors duration-200 ms-[-0.05em]">
@@ -185,6 +198,16 @@ import {
 				</div>
 			</a>
 		</nav>
+
+		<ContinueWatching client:load />
+		<FavoritesStrip client:load />
+		<RecentlyAddedStrip client:load />
+
+		<div
+			id="app-version"
+			class="fixed bottom-[max(0.5rem,env(safe-area-inset-bottom))] right-[max(0.75rem,env(safe-area-inset-right))] text-2xs text-fg-3 opacity-70 tabular-nums pointer-events-none">
+			Loading…
+		</div>
 	</main>
 </Layout>
 
@@ -207,29 +230,52 @@ import {
 	html[data-first-run="true"] #welcome {
 		display: flex;
 	}
+
+	/* tile-art / tile-art__layer rules live in global.css because the layers
+	   are created at runtime by index.astro's script and Astro's scoped
+	   styles only apply to markup-time class names. */
 </style>
 
 <script>
 	import "../scripts/updater-startup.js";
-	import { getEntries } from "@/scripts/lib/creds.js";
+	import { getEntries, getActiveEntry, loadCreds } from "@/scripts/lib/creds.js";
+	import { getCached, hydrate as hydrateCache } from "@/scripts/lib/cache.js";
+	import { getRecents, ensureLoaded as ensurePrefsLoaded } from "@/scripts/lib/preferences.js";
+	import { getProgrammesSync, getNowNext, loadProgrammes } from "@/scripts/lib/epg-data.js";
+	import { injectVersion } from "@/scripts/version.js";
+	injectVersion();
 
 	const eyebrow = document.getElementById("hero-eyebrow");
+	let heroChannelCount = 0;
+	const setHeroChannelCount = (count) => {
+		const next = Number.isFinite(count) ? Math.max(0, count) : 0;
+		if (next === heroChannelCount) return;
+		heroChannelCount = next;
+		window.__refreshHeroEyebrow?.();
+	};
 	if (eyebrow) {
+		const greet = (hour) => {
+			if (hour < 5) return "Good night";
+			if (hour < 12) return "Good morning";
+			if (hour < 18) return "Good afternoon";
+			if (hour < 22) return "Good evening";
+			return "Good night";
+		};
 		const update = () => {
 			const now = new Date();
-			const date = new Intl.DateTimeFormat(undefined, {
-				weekday: "short",
-				day: "2-digit",
-				month: "short",
-			}).format(now);
 			const time = new Intl.DateTimeFormat(undefined, {
 				hour: "numeric",
 				minute: "2-digit",
 			}).format(now);
-			eyebrow.textContent = `${date} · ${time}`;
+			const parts = [greet(now.getHours()), time];
+			if (heroChannelCount > 0) {
+				parts.push(`${heroChannelCount.toLocaleString()} channels`);
+			}
+			eyebrow.textContent = parts.join(" · ");
 		};
 		update();
 		setInterval(update, 30_000);
+		window.__refreshHeroEyebrow = update;
 	}
 
 	async function reconcileFirstRun() {
@@ -241,18 +287,185 @@ import {
 
 	window.addEventListener("load", async () => {
 		const hasEntries = await reconcileFirstRun();
-		setTimeout(() => {
-			const target = hasEntries
-				? /** @type {HTMLAnchorElement | null} */ (
-						document.querySelector('#hub-tiles a[href="/livetv"]')
-					)
-				: /** @type {HTMLAnchorElement | null} */ (
-						document.getElementById("welcome-add")
-					);
-			target?.focus({ preventScroll: true });
-		}, 0);
+		if (!hasEntries) {
+			document
+				.getElementById("welcome-add")
+				?.focus({ preventScroll: true });
+		}
 	});
 
 	document.addEventListener("xt:entries-updated", reconcileFirstRun);
 	document.addEventListener("xt:active-changed", reconcileFirstRun);
+
+	// ──────────────────────────────────────────────────────────
+	// Hub dashboard signals
+	// ──────────────────────────────────────────────────────────
+	const liveTileArt = document.getElementById("livetv-tile-art");
+	const liveTileSub = document.getElementById("livetv-tile-sub");
+	const moviesTileArt = document.getElementById("movies-tile-art");
+	const seriesTileArt = document.getElementById("series-tile-art");
+
+	let rotatorTimer = null;
+	function stopRotator() {
+		if (rotatorTimer) {
+			clearInterval(rotatorTimer);
+			rotatorTimer = null;
+		}
+	}
+
+	function startRotator(el, urls) {
+		if (!el || !urls.length) return;
+		const layers = [document.createElement("img"), document.createElement("img")];
+		for (const layer of layers) {
+			layer.className = "tile-art__layer";
+			layer.alt = "";
+			layer.decoding = "async";
+			layer.loading = "eager";
+			layer.referrerPolicy = "no-referrer";
+			layer.onerror = () => {
+				delete layer.dataset.on;
+			};
+			el.appendChild(layer);
+		}
+		let idx = 0;
+		let active = 0;
+		layers[active].src = urls[0];
+		layers[active].dataset.on = "true";
+		const advance = () => {
+			idx = (idx + 1) % urls.length;
+			const next = active === 0 ? 1 : 0;
+			layers[next].src = urls[idx];
+			layers[next].dataset.on = "true";
+			delete layers[active].dataset.on;
+			active = next;
+		};
+		const interval = setInterval(advance, 8000);
+		rotatorTimer = interval;
+	}
+
+	function pickRandom(arr, count) {
+		if (arr.length <= count) return arr.slice();
+		const seen = new Set();
+		const out = [];
+		while (out.length < count && seen.size < arr.length) {
+			const idx = Math.floor(Math.random() * arr.length);
+			if (seen.has(idx)) continue;
+			seen.add(idx);
+			out.push(arr[idx]);
+		}
+		return out;
+	}
+
+	async function setupTileArt() {
+		try {
+			stopRotator();
+			const active = await getActiveEntry();
+			if (!active) return;
+			await Promise.all([
+				hydrateCache(active._id, "vod").catch(() => {}),
+				hydrateCache(active._id, "series").catch(() => {}),
+				hydrateCache(active._id, "live").catch(() => {}),
+				hydrateCache(active._id, "m3u").catch(() => {}),
+			]);
+			if (moviesTileArt) {
+				const vod = (getCached(active._id, "vod")?.data || [])
+					.filter((m) => m && m.logo)
+					.map((m) => m.logo);
+				const picks = pickRandom(vod, 6);
+				moviesTileArt.replaceChildren();
+				if (picks.length) startRotator(moviesTileArt, picks);
+			}
+			if (seriesTileArt) {
+				const series = (getCached(active._id, "series")?.data || [])
+					.filter((s) => s && s.logo)
+					.map((s) => s.logo);
+				const picks = pickRandom(series, 6);
+				seriesTileArt.replaceChildren();
+				if (picks.length) startRotator(seriesTileArt, picks);
+			}
+			await setupLiveSignals(active);
+		} catch (e) {
+			console.warn("[hub] setupTileArt failed:", e);
+		}
+	}
+
+	async function setupLiveSignals(active) {
+		if (!liveTileArt || !liveTileSub) return;
+		await ensurePrefsLoaded();
+		const recents = getRecents(active._id, "live") || [];
+		const live = (getCached(active._id, "live")?.data || getCached(active._id, "m3u")?.data || []);
+		setHeroChannelCount(live.length);
+		const liveById = new Map(live.map((c) => [Number(c.id), c]));
+		let lastChannel = null;
+		if (recents.length) {
+			lastChannel = liveById.get(Number(recents[0].id)) || {
+				id: recents[0].id,
+				name: recents[0].name,
+				logo: recents[0].logo,
+				tvgId: null,
+			};
+		} else if (live.length) {
+			lastChannel = live[0];
+		}
+		liveTileArt.replaceChildren();
+		if (!lastChannel) {
+			liveTileSub.textContent = "Channels, and what's on right now.";
+			return;
+		}
+		if (lastChannel.logo) {
+			const layer = document.createElement("img");
+			layer.className = "tile-art__layer tile-art__layer--logo";
+			layer.alt = "";
+			layer.decoding = "async";
+			layer.loading = "eager";
+			layer.referrerPolicy = "no-referrer";
+			layer.onerror = () => layer.remove();
+			layer.src = lastChannel.logo;
+			layer.dataset.on = "true";
+			liveTileArt.appendChild(layer);
+		}
+		const tvgId = lastChannel.tvgId || "";
+		const setOnAir = (programme) => {
+			if (!programme) return false;
+			liveTileSub.innerHTML =
+				`<span class="text-fg-3 uppercase tracking-wider text-eyebrow font-semibold mr-2">On now</span>` +
+				`<span class="text-fg-2">${escapeHtml(lastChannel.name)}</span>` +
+				`<span class="text-fg-3 mx-1.5">·</span>` +
+				`<span class="text-fg">${escapeHtml(programme.title)}</span>`;
+			return true;
+		};
+		const cached = getProgrammesSync(active._id);
+		const cachedHit = cached?.programmes && tvgId
+			? setOnAir(getNowNext(cached.programmes, tvgId).current)
+			: false;
+		if (!cachedHit) {
+			liveTileSub.textContent = `Last watched: ${lastChannel.name}`;
+			if (tvgId) {
+				try {
+					const creds = await loadCreds();
+					if (creds?.host) {
+						const state = await loadProgrammes(active._id, creds);
+						if (state?.programmes) {
+							const { current } = getNowNext(state.programmes, tvgId);
+							if (current) setOnAir(current);
+						}
+					}
+				} catch {}
+			}
+		}
+	}
+
+	function escapeHtml(s) {
+		const d = document.createElement("div");
+		d.textContent = s || "";
+		return d.innerHTML;
+	}
+
+	if (typeof window !== "undefined") {
+		window.requestIdleCallback
+			? window.requestIdleCallback(setupTileArt, { timeout: 1500 })
+			: setTimeout(setupTileArt, 400);
+		document.addEventListener("xt:active-changed", setupTileArt);
+		document.addEventListener("xt:catalog-warmed", setupTileArt);
+	}
 </script>

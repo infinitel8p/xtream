@@ -6,17 +6,25 @@ import {
   buildApiUrl,
   normalize,
   debounce,
+  scoreNormMatch,
 } from "@/scripts/lib/creds.js"
-import { cachedFetch, getCached } from "@/scripts/lib/cache.js"
+import { cachedFetch, getCached, hydrate as hydrateCache } from "@/scripts/lib/cache.js"
 import {
   ensureLoaded as ensurePrefsLoaded,
   isFavorite,
   toggleFavorite,
   getFavorites,
   getRecents,
+  getHiddenCategories,
+  setCategoryHidden,
+  getViewSort,
+  setViewSort,
 } from "@/scripts/lib/preferences.js"
+import { toast } from "@/scripts/lib/toast.js"
+import { ICON_X } from "@/scripts/lib/icons.js"
 import { providerFetch } from "@/scripts/lib/provider-fetch.js"
 import { renderProviderError } from "@/scripts/lib/provider-error.js"
+import { fmtImdbRating } from "@/scripts/lib/format.js"
 
 const VOD_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -64,10 +72,16 @@ try {
 let activePlaylistId = ""
 let activePlaylistTitle = ""
 
-const hiddenCats = new Set()
+let showHidden = false
 
 const CAT_FAVORITES = "__favorites__"
 const CAT_RECENTS = "__recents__"
+
+function hiddenSet() {
+  return activePlaylistId
+    ? getHiddenCategories(activePlaylistId, "vod")
+    : new Set()
+}
 
 const STAR_OUTLINE =
   '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17.75l-6.18 3.25 1.18-6.88L2 9.25l6.91-1L12 2l3.09 6.25 6.91 1-5 4.87 1.18 6.88z"/></svg>'
@@ -89,6 +103,14 @@ document.addEventListener("xt:recents-changed", (e) => {
   if (detail.kind !== "vod") return
   if (activeCat === CAT_RECENTS) applyFilter()
   syncPseudoCategoryRows()
+})
+
+document.addEventListener("xt:hidden-categories-changed", (e) => {
+  const detail = /** @type {CustomEvent} */ (e).detail
+  if (!detail || detail.playlistId !== activePlaylistId) return
+  if (detail.kind !== "vod") return
+  renderCategoryPicker(all)
+  applyFilter()
 })
 
 // ----------------------------
@@ -126,6 +148,9 @@ function renderCategoryPicker(items) {
   const names = Array.from(counts.keys()).sort((a, b) =>
     a.localeCompare(b, "en", { sensitivity: "base" })
   )
+  const hidden = hiddenSet()
+  const visibleNames = names.filter((n) => !hidden.has(n))
+  const hiddenNames = names.filter((n) => hidden.has(n))
 
   const frag = document.createDocumentFragment()
 
@@ -135,22 +160,74 @@ function renderCategoryPicker(items) {
     }
   }
 
-  const addRow = (val, label, count = null, extraClass = "") => {
+  const addRow = (val, label, count = null, extraClass = "", opts = {}) => {
     const btn = document.createElement("button")
     btn.type = "button"
     btn.setAttribute("role", "option")
     btn.dataset.val = val
     btn.className =
-      "w-full px-3 py-2 text-sm flex items-center justify-between hover:bg-surface-2 focus:bg-surface-2 outline-none text-fg" +
-      (extraClass ? " " + extraClass : "")
+      "group/cat relative w-full px-3 py-2 text-sm flex items-center justify-between hover:bg-surface-2 focus:bg-surface-2 outline-none text-fg" +
+      (extraClass ? " " + extraClass : "") +
+      (opts.dim ? " opacity-60" : "")
     const left = document.createElement("span")
     left.className = "truncate"
     left.textContent = label
+    btn.appendChild(left)
+
     const right = document.createElement("span")
-    right.className =
-      "category-count ml-3 shrink-0 text-xs text-fg-3 tabular-nums"
-    right.textContent = count != null ? String(count) : ""
-    btn.append(left, right)
+    right.className = "ml-3 shrink-0 flex items-center gap-1.5"
+
+    let rightAction = null
+    if (opts.hideAction === "hide" || opts.hideAction === "unhide") {
+      rightAction = document.createElement("button")
+      rightAction.type = "button"
+      rightAction.tabIndex = 0
+      rightAction.className =
+        "category-hide-btn shrink-0 size-6 inline-flex items-center justify-center rounded-md text-fg-3 hover:text-fg hover:bg-surface-3 focus-visible:bg-surface-3 focus-visible:text-fg outline-none opacity-0 group-hover/cat:opacity-100 group-focus-within/cat:opacity-100 focus-visible:opacity-100 transition-opacity"
+      rightAction.setAttribute(
+        "aria-label",
+        opts.hideAction === "hide"
+          ? `Hide category "${label}"`
+          : `Unhide category "${label}"`
+      )
+      rightAction.title = opts.hideAction === "hide" ? "Hide category" : "Unhide category"
+      rightAction.innerHTML =
+        opts.hideAction === "hide"
+          ? ICON_X
+          : '<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7"/><circle cx="12" cy="12" r="3"/></svg>'
+      rightAction.addEventListener("click", (ev) => {
+        ev.stopPropagation()
+        ev.preventDefault()
+        if (!activePlaylistId) return
+        const willHide = opts.hideAction === "hide"
+        setCategoryHidden(activePlaylistId, "vod", val, willHide)
+        if (willHide) {
+          toast({
+            title: `Hid "${label}"`,
+            description: "Manage hidden categories in Settings.",
+            duration: 4000,
+          })
+          if (activeCat === val) {
+            setActiveCat("")
+          }
+        }
+      })
+    }
+
+    const countEl = document.createElement("span")
+    countEl.className = "category-count text-xs text-fg-3 tabular-nums min-w-8 text-right"
+    countEl.textContent = count != null ? String(count) : ""
+    right.appendChild(countEl)
+    if (rightAction) {
+      right.appendChild(rightAction)
+    } else {
+      const spacer = document.createElement("span")
+      spacer.className = "category-hide-btn shrink-0 size-6"
+      spacer.setAttribute("aria-hidden", "true")
+      right.appendChild(spacer)
+    }
+
+    btn.appendChild(right)
     btn.addEventListener("click", () => {
       setActiveCat(val)
       highlightActiveInList()
@@ -169,12 +246,38 @@ function renderCategoryPicker(items) {
   if (recs.length === 0) recRow.style.display = "none"
 
   addRow("", "All categories")
-  for (const name of names) addRow(name, name, counts.get(name))
+  for (const name of visibleNames) {
+    addRow(name, name, counts.get(name), "", { hideAction: "hide" })
+  }
+
+  if (hiddenNames.length) {
+    const toggle = document.createElement("button")
+    toggle.type = "button"
+    toggle.className =
+      "w-full px-3 py-2 text-xs text-fg-3 hover:text-fg hover:bg-surface-2 focus:bg-surface-2 outline-none flex items-center justify-between"
+    toggle.innerHTML =
+      `<span class="truncate">${showHidden ? "Hide" : "Show"} ${hiddenNames.length} hidden ${hiddenNames.length === 1 ? "category" : "categories"}</span>` +
+      `<span class="ml-3 shrink-0 tabular-nums">${showHidden ? "▴" : "▾"}</span>`
+    toggle.addEventListener("click", () => {
+      showHidden = !showHidden
+      renderCategoryPicker(items)
+    })
+    frag.appendChild(toggle)
+    if (showHidden) {
+      for (const name of hiddenNames) {
+        addRow(name, name, counts.get(name), "", {
+          hideAction: "unhide",
+          dim: true,
+        })
+      }
+    }
+  }
 
   categoryListEl.innerHTML = ""
   categoryListEl.appendChild(frag)
   if (categoryListStatus) {
-    categoryListStatus.textContent = `${names.length.toLocaleString()} categories`
+    const total = visibleNames.length
+    categoryListStatus.textContent = `${total.toLocaleString()} ${total === 1 ? "category" : "categories"}${hiddenNames.length ? ` · ${hiddenNames.length} hidden` : ""}`
   }
   highlightActiveInList()
 }
@@ -243,12 +346,15 @@ let renderedCount = 0
 function makeCard(m, idx) {
   const card = document.createElement("div")
   card.dataset.idx = String(idx)
+  const stagger = idx < 12
   card.className =
     "movie-card group relative rounded-xl overflow-hidden bg-surface-2 " +
     "ring-1 ring-line " +
     "transition-[transform,box-shadow] duration-150 " +
     "hover:ring-2 hover:ring-accent hover:[transform:translateY(-2px)] " +
-    "focus-within:ring-2 focus-within:ring-accent focus-within:[transform:translateY(-2px)]"
+    "focus-within:ring-2 focus-within:ring-accent focus-within:[transform:translateY(-2px)]" +
+    (stagger ? " grid-card-enter" : "")
+  if (stagger) card.style.animationDelay = `${idx * 28}ms`
   card.style.contentVisibility = "auto"
   card.style.containIntrinsicSize = "260px"
 
@@ -287,6 +393,22 @@ function makeCard(m, idx) {
     posterWrap.appendChild(img)
   } else {
     posterWrap.appendChild(makeFallback(m.name))
+  }
+
+  const ratingText = fmtImdbRating(m.rating)
+  if (ratingText) {
+    const ratingBadge = document.createElement("span")
+    ratingBadge.className =
+      "absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 " +
+      "rounded-md px-1.5 py-0.5 bg-black/55 backdrop-blur-sm " +
+      "ring-1 ring-white/10 text-white/90 text-2xs font-semibold tabular-nums"
+    ratingBadge.setAttribute("aria-label", `Rating ${ratingText} out of 10`)
+    ratingBadge.innerHTML =
+      '<svg viewBox="0 0 24 24" width="0.85em" height="0.85em" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true" class="text-accent">' +
+      '<path d="M12 17.75l-6.18 3.25 1.18-6.88L2 9.25l6.91-1L12 2l3.09 6.25 6.91 1-5 4.87 1.18 6.88z"/>' +
+      "</svg>" +
+      `<span>${ratingText}</span>`
+    posterWrap.appendChild(ratingBadge)
   }
 
   link.appendChild(posterWrap)
@@ -335,7 +457,10 @@ function makeCard(m, idx) {
     e.stopPropagation()
     e.preventDefault()
     if (!activePlaylistId) return
-    toggleFavorite(activePlaylistId, "vod", m.id)
+    toggleFavorite(activePlaylistId, "vod", m.id, {
+      name: m.name || "",
+      logo: m.logo || null,
+    })
   })
   card.appendChild(starBtn)
 
@@ -349,6 +474,52 @@ function makeFallback(name) {
     "text-fg-3 text-xs tracking-wide bg-gradient-to-br from-surface-2 to-surface-3"
   fb.textContent = name || "No poster"
   return fb
+}
+
+function posterSkeletonGeometry() {
+  const w = typeof window !== "undefined" ? window.innerWidth || 1280 : 1280
+  const h = typeof window !== "undefined" ? window.innerHeight || 720 : 720
+  const cardW = w >= 1024 ? 176 : w >= 640 ? 160 : 128
+  const cardH = cardW * 1.7
+  const cols = Math.max(2, Math.floor((w - 48) / (cardW + 16)))
+  const rows = Math.max(2, Math.ceil(h / cardH) + 1)
+  const count = Math.min(48, cols * rows)
+  return { cols, count }
+}
+
+function posterSkeletonCount() {
+  return posterSkeletonGeometry().count
+}
+
+function renderPosterSkeletons(target, count) {
+  if (!target) return
+  const geom = posterSkeletonGeometry()
+  const total = Number.isFinite(count) && count > 0 ? count : geom.count
+  const cols = geom.cols || 4
+  const frag = document.createDocumentFragment()
+  for (let i = 0; i < total; i++) {
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    // Diagonal wave
+    const waveDelay = ((col * 90) + (row * 140)) % 1600
+    // Soft entrance stagger - cap at 8 cards
+    const enterDelay = Math.min(i, 8) * 28
+
+    const card = document.createElement("div")
+    card.dataset.skeleton = "true"
+    card.className =
+      "rounded-xl overflow-hidden ring-1 ring-line bg-surface-2"
+    card.style.setProperty("--skel-delay", `${waveDelay}ms`)
+    card.style.setProperty("--skel-enter-delay", `${enterDelay}ms`)
+    card.innerHTML =
+      `<div class="aspect-2/3 w-full skel" style="--skel-delay:${waveDelay}ms;"></div>
+       <div class="px-2 py-2 flex flex-col gap-1.5">
+         <div class="h-3 rounded skel" style="width:${60 + ((i * 7) % 35)}%; --skel-delay:${waveDelay + 80}ms;"></div>
+         <div class="h-2.5 rounded skel" style="width:${30 + ((i * 5) % 30)}%; --skel-delay:${waveDelay + 160}ms;"></div>
+       </div>`
+    frag.appendChild(card)
+  }
+  target.replaceChildren(frag)
 }
 
 function teardownInfiniteObs() {
@@ -504,19 +675,77 @@ function applyFilter() {
     out = all.filter((m) => {
       if (activeCat && (m.category || "") !== activeCat) return false
       const cat = (m.category || "").toString()
-      if (cat && hiddenCats.has(cat)) return false
+      if (cat && hiddenSet().has(cat)) return false
       return true
     })
   }
 
+  /** @type {Map<number, number> | null} */
+  let scoreById = null
   if (tokens.length) {
-    out = out.filter((m) => tokens.every((t) => m.norm.includes(t)))
+    scoreById = new Map()
+    const scored = []
+    for (const movie of out) {
+      const score = scoreNormMatch(movie.norm, tokens)
+      if (score > 0) {
+        scored.push(movie)
+        scoreById.set(movie.id, score)
+      }
+    }
+    out = scored
+  }
+
+  const mode = activePlaylistId
+    ? getViewSort(activePlaylistId, "vod")
+    : "default"
+  if (mode === "default" && scoreById) {
+    out = out
+      .slice()
+      .sort((firstMovie, secondMovie) =>
+        (scoreById.get(secondMovie.id) || 0) - (scoreById.get(firstMovie.id) || 0)
+      )
+  } else if (mode === "added") {
+    out = out
+      .slice()
+      .sort((a, b) => Number(b.added || 0) - Number(a.added || 0))
+  } else if (mode === "az") {
+    out = out
+      .slice()
+      .sort((a, b) =>
+        (a.name || "").localeCompare(b.name || "", "en", {
+          sensitivity: "base",
+        })
+      )
   }
 
   filtered = out
   listStatus.textContent = `${out.length.toLocaleString()} of ${all.length.toLocaleString()} movies`
+  const heroCount = document.getElementById("movie-hero-count")
+  if (heroCount) heroCount.textContent = out.length.toLocaleString()
+  const heroCat = document.getElementById("movie-hero-cat")
+  if (heroCat) {
+    heroCat.textContent =
+      activeCat === CAT_FAVORITES
+        ? "Favorites"
+        : activeCat === CAT_RECENTS
+          ? "Recently watched"
+          : activeCat || "All categories"
+  }
   renderGrid()
 }
+
+const sortEl = /** @type {HTMLSelectElement|null} */ (
+  document.getElementById("movie-sort")
+)
+function syncSortControl() {
+  if (!sortEl || !activePlaylistId) return
+  sortEl.value = getViewSort(activePlaylistId, "vod")
+}
+sortEl?.addEventListener("change", () => {
+  if (!activePlaylistId || !sortEl) return
+  setViewSort(activePlaylistId, "vod", sortEl.value)
+  applyFilter()
+})
 
 searchEl?.addEventListener(
   "input",
@@ -570,13 +799,15 @@ async function loadMovies() {
   activePlaylistId = active._id
   activePlaylistTitle = active.title || ""
   await ensurePrefsLoaded()
+  syncSortControl()
+  await hydrateCache(active._id, "vod")
 
   const hit = getCached(active._id, "vod")
   if (hit) {
     paintMovies(hit.data, true, hit.age)
   } else {
     listStatus.textContent = "Loading movies…"
-    if (gridEl) gridEl.replaceChildren()
+    if (!gridEl?.querySelector("[data-skeleton]")) renderPosterSkeletons(gridEl)
   }
 
   creds = await loadCreds()
@@ -625,6 +856,7 @@ async function loadMovies() {
             if (!category && categoryId != null && catMap?.size) {
               category = catMap.get(String(categoryId)) || ""
             }
+            const added = Number(m.added) || 0
             return {
               id,
               name,
@@ -634,6 +866,7 @@ async function loadMovies() {
               duration: duration ? String(duration) : "",
               category,
               plot: "",
+              added,
               norm: normalize(`${name} ${category} ${year}`),
             }
           })
@@ -660,9 +893,21 @@ async function loadMovies() {
 // ----------------------------
 // Boot
 // ----------------------------
+// First-paint skeleton
+if (gridEl && !gridEl.childElementCount) {
+  renderPosterSkeletons(gridEl, posterSkeletonCount())
+}
+if (listStatus && /no playlist selected/i.test(listStatus.textContent || "")) {
+  listStatus.textContent = "Loading movies…"
+}
+
 document.addEventListener("xt:active-changed", () => loadMovies())
 
 ;(async () => {
   creds = await loadCreds()
-  if (creds.host && creds.user && creds.pass) loadMovies()
+  if (creds.host && creds.user && creds.pass) {
+    loadMovies()
+  } else {
+    showEmptyState()
+  }
 })()

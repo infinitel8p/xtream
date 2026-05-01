@@ -102,6 +102,8 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 		renderPlaylistRow,
 		PLAYLIST_LIST_EMPTY_COPY,
 	} from "@/scripts/lib/playlist-rows.js";
+	import { hydrate as hydrateCache } from "@/scripts/lib/cache.js";
+	import { toastSuccess, toastError } from "@/scripts/lib/toast.js";
 
 	const wrap = /** @type {HTMLElement|null} */ (
 		document.querySelector("[data-ps-wrap]")
@@ -196,8 +198,16 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 	});
 
 	refreshBtn?.addEventListener("click", async () => {
-		await refreshActive();
 		closePopover();
+		try {
+			await refreshActive();
+			toastSuccess("Playlist refreshed");
+		} catch (e) {
+			toastError("Couldn't refresh playlist", {
+				description: (e && e.message) || "Check your connection or login.",
+				duration: 6000,
+			});
+		}
 	});
 
 	async function renderHeader() {
@@ -232,6 +242,14 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 			return;
 		}
 		const active = await getActiveEntry();
+		await Promise.all(
+			entries.flatMap((e) => [
+				hydrateCache(e._id, "live"),
+				hydrateCache(e._id, "m3u"),
+				hydrateCache(e._id, "vod"),
+				hydrateCache(e._id, "series"),
+			])
+		);
 		const frag = document.createDocumentFragment();
 		for (const e of entries) {
 			frag.appendChild(
@@ -259,6 +277,7 @@ import { IconChevronDown, IconPlus, IconRefresh } from "@tabler/icons-svelte";
 		renderList();
 	});
 	document.addEventListener("xt:entries-updated", renderList);
+	document.addEventListener("xt:catalog-warmed", renderList);
 
 	await renderHeader();
 	await renderList();

@@ -90,4 +90,69 @@ export function setDownloadConcurrency(n) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Discord Rich Presence
+// ---------------------------------------------------------------------------
+const KEY_DISCORD_CLIENT_ID = "xt_discord_client_id"
+const KEY_DISCORD_MUTED = "xt_discord_muted"
+const DEFAULT_DISCORD_CLIENT_ID = "1499717588073058344"
+export const DISCORD_RPC_EVENT = "xt:discord-rpc-changed"
+
+export function getDiscordClientId() {
+  return readLS(KEY_DISCORD_CLIENT_ID, "") || DEFAULT_DISCORD_CLIENT_ID
+}
+
+export function setDiscordClientId(clientId) {
+  writeLS(KEY_DISCORD_CLIENT_ID, (clientId || "").trim())
+  document.dispatchEvent(
+    new CustomEvent(DISCORD_RPC_EVENT, {
+      detail: { key: "clientId", value: clientId || "" },
+    })
+  )
+}
+
+function readDiscordMutedSet() {
+  try {
+    const raw = localStorage.getItem(KEY_DISCORD_MUTED) || ""
+    if (!raw) return new Set()
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.map(String))
+  } catch {
+    return new Set()
+  }
+}
+
+function writeDiscordMutedSet(set) {
+  try {
+    if (set.size === 0) localStorage.removeItem(KEY_DISCORD_MUTED)
+    else localStorage.setItem(KEY_DISCORD_MUTED, JSON.stringify([...set]))
+  } catch {}
+}
+
+export function isDiscordEnabledForPlaylist(playlistId) {
+  if (!playlistId) return true
+  return !readDiscordMutedSet().has(String(playlistId))
+}
+
+export function setDiscordEnabledForPlaylist(playlistId, on) {
+  if (!playlistId) return
+  const set = readDiscordMutedSet()
+  const id = String(playlistId)
+  const muted = set.has(id)
+  if (on && muted) set.delete(id)
+  else if (!on && !muted) set.add(id)
+  else return
+  writeDiscordMutedSet(set)
+  document.dispatchEvent(
+    new CustomEvent(DISCORD_RPC_EVENT, {
+      detail: { key: "playlist", playlistId: id, value: on },
+    })
+  )
+}
+
+export function isDiscordGloballyEnabled() {
+  return !!getDiscordClientId()
+}
+
 export const SETTINGS_EVENT = EVT_CHANGED

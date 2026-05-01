@@ -13,6 +13,11 @@ import {
   isFavorite,
   toggleFavorite,
   pushRecent,
+  getProgress,
+  setProgress,
+  markCompleted,
+  isCompleted,
+  clearProgress,
 } from "@/scripts/lib/preferences.js"
 import { providerFetch } from "@/scripts/lib/provider-fetch.js"
 import {
@@ -34,6 +39,8 @@ import {
   chooseMime,
 } from "@/scripts/lib/morph-detail.js"
 import { attachPlayerFocusKeeper } from "@/scripts/lib/player-focus-keeper.js"
+import { fmtImdbRating } from "@/scripts/lib/format.js"
+import { setRichPresence, clearRichPresence } from "@/scripts/lib/discord-rpc.js"
 
 const SERIES_INFO_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -151,11 +158,41 @@ function renderSeasonTabs(seasonKeys) {
     btn.textContent = `Season ${key}`
     btn.addEventListener("click", () => {
       if (currentSeason === key) return
+      const oldKey = currentSeason
+      const direction = (Number(key) || 0) > (Number(oldKey) || 0) ? 1 : -1
       currentSeason = key
       renderSeasonTabs(seasonKeys)
-      renderEpisodes()
+      slotMachineEpisodes(direction)
     })
     seasonTabs.appendChild(btn)
+  }
+}
+
+function slotMachineEpisodes(direction) {
+  if (!episodeList) return
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+  if (reduceMotion) {
+    renderEpisodes()
+    return
+  }
+  const dy = direction >= 0 ? -16 : 16
+  const dyIn = direction >= 0 ? 16 : -16
+  const easing = "cubic-bezier(0.16, 1, 0.3, 1)"
+  episodeList.animate(
+    [
+      { opacity: 1, transform: "translateY(0)" },
+      { opacity: 0, transform: `translateY(${dy}px)` },
+    ],
+    { duration: 180, easing, fill: "forwards" }
+  ).onfinish = () => {
+    renderEpisodes()
+    episodeList.animate(
+      [
+        { opacity: 0, transform: `translateY(${dyIn}px)` },
+        { opacity: 1, transform: "translateY(0)" },
+      ],
+      { duration: 280, easing, fill: "forwards" }
+    )
   }
 }
 
@@ -179,6 +216,12 @@ function renderEpisodes() {
     if (currentPlayingEpisodeId != null && Number(ep.id) === currentPlayingEpisodeId) {
       row.dataset.nowPlaying = "true"
     }
+    if (
+      activePlaylistId &&
+      isCompleted(activePlaylistId, "episode", ep.id)
+    ) {
+      row.dataset.watched = "true"
+    }
 
     const playBtn = document.createElement("button")
     playBtn.type = "button"
@@ -189,7 +232,7 @@ function renderEpisodes() {
 
     const num = document.createElement("div")
     num.className =
-      "shrink-0 size-10 rounded-md bg-surface-3 flex items-center justify-center text-sm font-semibold tabular-nums text-fg-2"
+      "episode-num shrink-0 size-10 rounded-md bg-surface-3 flex items-center justify-center text-sm font-semibold tabular-nums text-fg-2"
     num.textContent = `E${ep.episode_num || "?"}`
     playBtn.appendChild(num)
 
@@ -212,6 +255,12 @@ function renderEpisodes() {
 
     playBtn.appendChild(wrap)
 
+    const epProgress = activePlaylistId
+      ? getProgress(activePlaylistId, "episode", ep.id)
+      : null
+    const canResume =
+      epProgress && !epProgress.completed && epProgress.position > RESUME_MIN_SECONDS
+
     const arrow = document.createElement("span")
     arrow.className = "shrink-0 text-fg-3 text-base"
     arrow.textContent = "▶"
@@ -219,13 +268,50 @@ function renderEpisodes() {
 
     row.appendChild(playBtn)
 
+    if (canResume) {
+      const restartBtn = document.createElement("button")
+      restartBtn.type = "button"
+      restartBtn.className =
+        "shrink-0 rounded-lg border border-line min-h-11 min-w-11 inline-flex items-center justify-center text-fg-3 " +
+        "hover:bg-surface-2 hover:text-fg focus-visible:bg-surface-2 focus-visible:text-fg focus-visible:border-accent " +
+        "outline-none transition-colors"
+      restartBtn.title = "Start from beginning"
+      restartBtn.setAttribute(
+        "aria-label",
+        `Start ${ep.title || `episode ${ep.episode_num || ""}`} from the beginning`
+      )
+      restartBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="size-4"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>'
+      restartBtn.addEventListener("click", (e) => {
+        e.stopPropagation()
+        if (!activePlaylistId) return
+        clearProgress(activePlaylistId, "episode", ep.id)
+        playEpisode(ep)
+      })
+      row.appendChild(restartBtn)
+
+      const fraction =
+        epProgress.duration > 0
+          ? Math.max(0, Math.min(1, epProgress.position / epProgress.duration))
+          : 0
+      const progressEl = document.createElement("div")
+      progressEl.className =
+        "absolute left-3 right-3 bottom-1 h-0.5 rounded-full bg-line/40 overflow-hidden pointer-events-none"
+      const progressFill = document.createElement("div")
+      progressFill.className = "h-full bg-accent"
+      progressFill.style.width = `${fraction * 100}%`
+      progressEl.appendChild(progressFill)
+      row.appendChild(progressEl)
+      row.classList.add("relative")
+    }
+
     if (isDownloadable()) {
       const epUrl = buildEpisodeStreamUrl(ep)
       if (epUrl) {
         const dlBtn = document.createElement("button")
         dlBtn.type = "button"
         dlBtn.className =
-          "shrink-0 rounded-lg border border-line min-h-11 px-3 text-xs text-fg-2 tabular-nums " +
+          "shrink-0 rounded-lg border border-line min-h-11 min-w-24 px-3 text-xs text-fg-2 tabular-nums " +
           "hover:bg-surface-2 hover:text-fg focus-visible:bg-surface-2 focus-visible:text-fg focus-visible:border-accent " +
           "outline-none transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         dlBtn.dataset.dlUrl = epUrl
@@ -350,11 +436,28 @@ function applySeriesInfo(data) {
 
   if (metaEl) {
     const bits = []
-    if (year) bits.push(String(year))
-    if (genre) bits.push(genre)
-    if (rating) bits.push(`Rating: ${String(rating).slice(0, 4)}`)
-    if (seasons.length) bits.push(`${seasons.length} season${seasons.length > 1 ? "s" : ""}`)
-    metaEl.textContent = bits.join(" • ")
+    if (year) bits.push(`<span>${escapeRatingText(String(year))}</span>`)
+    if (genre) bits.push(`<span>${escapeRatingText(genre)}</span>`)
+    const ratingText = fmtImdbRating(rating)
+    if (ratingText) {
+      bits.push(
+        '<span class="inline-flex items-center gap-1 text-fg-2" aria-label="IMDB rating ' +
+          ratingText +
+          ' out of 10">' +
+          '<svg viewBox="0 0 24 24" width="0.95em" height="0.95em" fill="currentColor" aria-hidden="true" class="text-accent">' +
+          '<path d="M12 17.75l-6.18 3.25 1.18-6.88L2 9.25l6.91-1L12 2l3.09 6.25 6.91 1-5 4.87 1.18 6.88z"/>' +
+          "</svg>" +
+          `<span class="font-medium tabular-nums">${ratingText}</span>` +
+          '<span class="text-fg-3">/10</span>' +
+          "</span>"
+      )
+    }
+    if (seasons.length) {
+      bits.push(
+        `<span>${seasons.length} season${seasons.length > 1 ? "s" : ""}</span>`
+      )
+    }
+    metaEl.innerHTML = bits.join(' <span aria-hidden="true">·</span> ')
   }
   if (plotEl) {
     plotEl.textContent = plot || (cast ? `Cast: ${cast}` : "No description available.")
@@ -408,10 +511,33 @@ function applySeriesInfo(data) {
   renderEpisodes()
 }
 
+function escapeRatingText(text) {
+  const div = document.createElement("div")
+  div.textContent = String(text)
+  return div.innerHTML
+}
+
 // ----------------------------
 // Playback
 // ----------------------------
 let vjs = null
+let progressListenersBound = false
+let currentEpisode = null
+const RESUME_MIN_SECONDS = 30
+const RESUME_MAX_FRACTION = 0.95
+const PROGRESS_WRITE_INTERVAL_MS = 5000
+
+function progressExtrasFor(ep) {
+  return {
+    seriesId: series?.id ?? null,
+    season: ep.season ?? currentSeason ?? null,
+    episodeNum: ep.episode_num ?? null,
+    episodeTitle: ep.title || "",
+    seriesName: series?.name || "",
+    seriesLogo: series?.logo || null,
+  }
+}
+
 async function ensurePlayer() {
   if (vjs) return vjs
   const [{ default: videojs }] = await Promise.all([
@@ -429,6 +555,8 @@ async function ensurePlayer() {
       volumePanel: { inline: false },
       pictureInPictureToggle: !hasNativePipBridge,
       playbackRateMenuButton: true,
+      subsCapsButton: true,
+      audioTrackButton: true,
       fullscreenToggle: true,
     },
     html5: {
@@ -460,6 +588,7 @@ async function playEpisode(episode) {
   if (!series || !episode) return
   const src = buildEpisodeStreamUrl(episode)
   if (!src) return
+  dismissUpNext()
 
   if (activePlaylistId) {
     pushRecent(
@@ -499,26 +628,269 @@ async function playEpisode(episode) {
       src: playSrc,
     })
   })
+
+  currentEpisode = episode
+
+  const saved = activePlaylistId
+    ? getProgress(activePlaylistId, "episode", episode.id)
+    : null
+  if (saved && !saved.completed && saved.position > RESUME_MIN_SECONDS) {
+    player.one("loadedmetadata", () => {
+      const dur = player.duration() || saved.duration || 0
+      const pos = saved.position
+      if (dur === 0 || pos / dur < RESUME_MAX_FRACTION) {
+        try { player.currentTime(pos) } catch {}
+      }
+    })
+  }
+
   player.src({ src: playSrc, type: mime })
+
+  if (!progressListenersBound) {
+    progressListenersBound = true
+    let lastWriteAt = 0
+    player.on("timeupdate", () => {
+      if (!activePlaylistId || !currentEpisode) return
+      const now = Date.now()
+      if (now - lastWriteAt < PROGRESS_WRITE_INTERVAL_MS) return
+      const pos = player.currentTime() || 0
+      const dur = player.duration() || 0
+      if (pos < 1) return
+      lastWriteAt = now
+      setProgress(
+        activePlaylistId,
+        "episode",
+        currentEpisode.id,
+        pos,
+        dur,
+        progressExtrasFor(currentEpisode)
+      )
+    })
+    player.on("ended", () => {
+      if (!activePlaylistId || !currentEpisode) return
+      const dur = player.duration() || 0
+      markCompleted(activePlaylistId, "episode", currentEpisode.id, {
+        duration: dur,
+        ...progressExtrasFor(currentEpisode),
+      })
+      const nextEp = findNextEpisode(currentEpisode)
+      if (nextEp) showUpNextOverlay(nextEp)
+    })
+  }
+
   player.play().catch((err) =>
     console.warn("[xt:series-detail] play() rejected:", err?.message || err)
   )
+
+  if (activePlaylistId && series) {
+    setRichPresence({
+      playlistId: activePlaylistId,
+      details: series.name || "Watching a series",
+      state: `S${episode.season || currentSeason || "?"}E${episode.episode_num || "?"} · ${episode.title || ""}`.trim(),
+      largeImage: series.logo || "logo",
+      largeText: series.name || "Extreme InfiniTV",
+      smallImage: "series",
+      smallText: "Series",
+      startTimestamp: Date.now(),
+    })
+  }
 }
 
 window.addEventListener("pagehide", () => {
   try {
+    if (activePlaylistId && currentEpisode && vjs) {
+      const pos = vjs.currentTime?.() || 0
+      const dur = vjs.duration?.() || 0
+      if (pos > 1) {
+        setProgress(
+          activePlaylistId,
+          "episode",
+          currentEpisode.id,
+          pos,
+          dur,
+          progressExtrasFor(currentEpisode)
+        )
+      }
+    }
     vjs?.pause?.()
     vjs?.dispose?.()
   } catch {}
   clearAmbient(ambientEl)
+  clearRichPresence().catch(() => {})
 })
+
+// ----------------------------
+// Up-next overlay (10s countdown after an episode ends)
+// ----------------------------
+const UPNEXT_SECONDS = 10
+let upNextEl = null
+let upNextTimer = null
+let upNextKeyHandler = null
+let upNextActive = false
+
+function findNextEpisode(currentEp) {
+  if (!episodesByKey || !currentEp) return null
+  const seasonKeys = Object.keys(episodesByKey).sort(
+    (a, b) => Number(a) - Number(b)
+  )
+  const currentSeasonKey = String(currentEp.season ?? currentSeason ?? "")
+  const inSeason = episodesByKey[currentSeasonKey] || []
+  const idx = inSeason.findIndex((ep) => Number(ep.id) === Number(currentEp.id))
+  if (idx >= 0 && idx + 1 < inSeason.length) {
+    return { season: currentSeasonKey, episode: inSeason[idx + 1] }
+  }
+  const seasonIdx = seasonKeys.indexOf(currentSeasonKey)
+  for (let cursor = seasonIdx + 1; cursor < seasonKeys.length; cursor++) {
+    const eps = episodesByKey[seasonKeys[cursor]] || []
+    if (eps.length) return { season: seasonKeys[cursor], episode: eps[0] }
+  }
+  return null
+}
+
+function dismissUpNext() {
+  if (upNextTimer) {
+    clearInterval(upNextTimer)
+    upNextTimer = null
+  }
+  if (upNextKeyHandler) {
+    document.removeEventListener("keydown", upNextKeyHandler, true)
+    upNextKeyHandler = null
+  }
+  if (upNextEl) {
+    upNextEl.remove()
+    upNextEl = null
+  }
+  upNextActive = false
+}
+
+function getUpNextHost() {
+  // Prefer the Video.js root element so the card travels with the player
+  // into fullscreen. Fall back to the outer wrap if Video.js hasn't mounted
+  // yet (e.g. user hit the Restart-from-beginning path).
+  const vjsRoot = vjs?.el?.()
+  return vjsRoot || playerWrap || null
+}
+
+function showUpNextOverlay(next) {
+  const host = getUpNextHost()
+  if (!host || upNextActive) return
+  dismissUpNext()
+  upNextActive = true
+
+  const seasonLabel = next.season || next.episode.season || ""
+  const epNum = next.episode.episode_num || "?"
+  const epTitle = next.episode.title || `Episode ${epNum}`
+
+  upNextEl = document.createElement("div")
+  upNextEl.className =
+    "up-next-card absolute right-3 bottom-3 z-30 max-w-sm w-[min(22rem,calc(100%-1.5rem))] " +
+    "rounded-2xl border border-line bg-surface/95 backdrop-blur-md shadow-2xl " +
+    "p-4 flex flex-col gap-3 ring-1 ring-accent/30"
+  upNextEl.setAttribute("role", "dialog")
+  upNextEl.setAttribute("aria-live", "polite")
+  upNextEl.setAttribute("aria-label", "Up next")
+
+  const eyebrow = document.createElement("div")
+  eyebrow.className =
+    "text-eyebrow font-semibold uppercase text-accent tracking-widest"
+  eyebrow.textContent = "Up next"
+  upNextEl.appendChild(eyebrow)
+
+  const titleRow = document.createElement("div")
+  titleRow.className = "flex flex-col gap-0.5 min-w-0"
+  const seasonEl = document.createElement("div")
+  seasonEl.className = "text-2xs text-fg-3 tabular-nums"
+  seasonEl.textContent = seasonLabel
+    ? `S${seasonLabel} · E${epNum}`
+    : `Episode ${epNum}`
+  const epTitleEl = document.createElement("div")
+  epTitleEl.className = "text-sm font-semibold text-fg truncate"
+  epTitleEl.textContent = epTitle
+  titleRow.append(seasonEl, epTitleEl)
+  upNextEl.appendChild(titleRow)
+
+  const progressTrack = document.createElement("div")
+  progressTrack.className = "h-1 rounded-full bg-line/50 overflow-hidden"
+  const progressFill = document.createElement("div")
+  progressFill.className = "h-full bg-accent transition-[width] duration-200"
+  progressFill.style.width = "0%"
+  progressTrack.appendChild(progressFill)
+  upNextEl.appendChild(progressTrack)
+
+  const actions = document.createElement("div")
+  actions.className = "flex items-center justify-between gap-2"
+  const countdownEl = document.createElement("span")
+  countdownEl.className = "text-xs text-fg-3 tabular-nums"
+  const skipBtn = document.createElement("button")
+  skipBtn.type = "button"
+  skipBtn.className =
+    "rounded-lg border border-line px-3 min-h-9 text-xs text-fg-2 " +
+    "hover:bg-surface-2 hover:text-fg focus-visible:bg-surface-2 focus-visible:text-fg " +
+    "focus-visible:border-accent outline-none transition-colors"
+  skipBtn.textContent = "Cancel"
+  skipBtn.addEventListener("click", () => dismissUpNext())
+  const playNowBtn = document.createElement("button")
+  playNowBtn.type = "button"
+  playNowBtn.className =
+    "rounded-lg bg-accent text-bg px-3 min-h-9 text-xs font-semibold " +
+    "hover:brightness-110 focus-visible:brightness-110 outline-none transition-[filter,transform] " +
+    "active:scale-[0.97]"
+  playNowBtn.textContent = "Play now"
+  playNowBtn.addEventListener("click", () => {
+    dismissUpNext()
+    currentSeason = next.season
+    renderSeasonTabs(Object.keys(episodesByKey || {}).sort((a, b) => Number(a) - Number(b)))
+    renderEpisodes()
+    playEpisode(next.episode)
+  })
+  actions.append(countdownEl, skipBtn, playNowBtn)
+  upNextEl.appendChild(actions)
+
+  if (host === playerWrap) host.classList.add("relative")
+  host.appendChild(upNextEl)
+
+  let remaining = UPNEXT_SECONDS
+  const tick = () => {
+    countdownEl.textContent = `Playing in ${remaining}s`
+    progressFill.style.width = `${((UPNEXT_SECONDS - remaining) / UPNEXT_SECONDS) * 100}%`
+  }
+  tick()
+  upNextTimer = setInterval(() => {
+    remaining--
+    tick()
+    if (remaining <= 0) {
+      dismissUpNext()
+      currentSeason = next.season
+      renderSeasonTabs(
+        Object.keys(episodesByKey || {}).sort((a, b) => Number(a) - Number(b))
+      )
+      renderEpisodes()
+      playEpisode(next.episode)
+    }
+  }, 1000)
+
+  upNextKeyHandler = (event) => {
+    if (event.ctrlKey || event.altKey || event.metaKey) return
+    if (event.key === "Enter") {
+      event.preventDefault()
+      playNowBtn.click()
+      return
+    }
+    // Any other key cancels - matches Plex/Netflix UX.
+    dismissUpNext()
+  }
+  document.addEventListener("keydown", upNextKeyHandler, true)
+}
 
 // ----------------------------
 // Favorites
 // ----------------------------
 favBtn?.addEventListener("click", () => {
   if (!series || !activePlaylistId) return
-  toggleFavorite(activePlaylistId, "series", series.id)
+  toggleFavorite(activePlaylistId, "series", series.id, {
+    name: series.name || series.title || "",
+    logo: series.logo || series.cover || null,
+  })
 })
 
 document.addEventListener("xt:favorites-changed", (e) => {
@@ -526,6 +898,19 @@ document.addEventListener("xt:favorites-changed", (e) => {
   if (!detail || detail.playlistId !== activePlaylistId) return
   if (detail.kind !== "series") return
   if (series?.id === detail.id) syncFavButton()
+})
+
+document.addEventListener("xt:progress-changed", (e) => {
+  const detail = e.detail
+  if (!detail || detail.playlistId !== activePlaylistId) return
+  if (detail.kind !== "episode") return
+  if (!episodeList) return
+  const row = episodeList.querySelector(
+    `.episode-row[data-ep-id="${CSS.escape(String(detail.id))}"]`
+  )
+  if (!row) return
+  if (detail.completed) row.dataset.watched = "true"
+  else delete row.dataset.watched
 })
 
 // ----------------------------

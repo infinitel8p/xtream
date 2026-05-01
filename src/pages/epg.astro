@@ -1,13 +1,22 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import SearchInput from "@/components/SearchInput.astro";
-import { IconRefresh, IconArrowLeft, IconChevronDown } from "@tabler/icons-svelte";
+import { IconRefresh, IconArrowLeft, IconChevronDown, IconClockHour3 } from "@tabler/icons-svelte";
 ---
 
 <Layout pageTitle="EPG">
 	<main
 		class="w-full max-w-480 mx-auto px-4 md:px-6 lg:px-8 pt-4 lg:pt-6 md:landscape:pt-6 pb-6
 			flex flex-col gap-3 flex-1 min-h-0">
+
+		<header class="route-hero shrink-0">
+			<h1 class="route-hero__title">N<em>o</em>w &amp; next</h1>
+			<p
+				id="epg-title"
+				class="route-hero__sub truncate min-w-0">
+				EPG · All categories
+			</p>
+		</header>
 
 		<!-- Toolbar -->
 		<section class="flex items-center gap-3 shrink-0 flex-wrap">
@@ -19,11 +28,6 @@ import { IconRefresh, IconArrowLeft, IconChevronDown } from "@tabler/icons-svelt
 				<IconArrowLeft aria-hidden="true" stroke={2} class="size-4" />
 				Live TV
 			</a>
-			<h1
-				id="epg-title"
-				class="text-base sm:text-lg font-semibold tracking-tight truncate min-w-0 flex-1">
-				EPG
-			</h1>
 			<button
 				id="epg-category-trigger"
 				type="button"
@@ -40,6 +44,16 @@ import { IconRefresh, IconArrowLeft, IconChevronDown } from "@tabler/icons-svelt
 					stroke={2}
 					class="size-4 text-fg-3 shrink-0"
 				/>
+			</button>
+			<button
+				id="epg-now"
+				type="button"
+				aria-label="Snap timeline to now"
+				title="Snap to now"
+				class="rounded-xl border border-line bg-surface p-2 sm:px-3 text-sm text-fg-2 inline-flex items-center gap-2 shrink-0
+					hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent transition-colors">
+				<IconClockHour3 aria-hidden="true" stroke={2} class="size-4" />
+				<span class="hidden sm:inline">Now</span>
 			</button>
 			<button
 				id="epg-refresh"

@@ -268,13 +268,44 @@ export async function updateEntry(id, patch) {
   if (s.selectedId === id) dispatch(EVT_ACTIVE_CHANGED, await getActiveEntry())
 }
 
-/** Force a re-fetch of the active playlist's data. */
+/**
+ * Replace the entire playlist state. Used by the import-settings flow.
+ * Caller is responsible for sanitising the input shape before calling.
+ * @param {{ entries: any[], selectedId: string }} state
+ */
+export async function restoreState(state) {
+  const safe = {
+    entries: Array.isArray(state?.entries) ? state.entries : [],
+    selectedId: typeof state?.selectedId === "string" ? state.selectedId : "",
+  }
+  await writeRaw(safe)
+  migrationPromise = Promise.resolve(safe)
+  try {
+    const { invalidateEntry } = await import("./cache.js")
+    for (const e of safe.entries) {
+      if (e?._id) invalidateEntry(e._id)
+    }
+  } catch {}
+  dispatch(EVT_ENTRIES_UPDATED)
+  dispatch(EVT_ACTIVE_CHANGED, safe.entries.find((e) => e._id === safe.selectedId) || null)
+}
+
+/** Force a re-fetch of the active playlist's data.
+ *  Keeps the existing cache as a fallback */
 export async function refreshActive() {
   const active = await getActiveEntry()
   if (!active) return
-  const { invalidateEntry } = await import("./cache.js")
-  invalidateEntry(active._id)
+  const { warmupActive } = await import("./catalog.js")
+  let result = null
+  try {
+    result = await warmupActive(active._id, { force: true })
+  } catch (err) {
+    console.warn("[xt:creds] refreshActive: warmupActive threw", err)
+  }
   dispatch(EVT_ACTIVE_CHANGED, active)
+  if (result?.errors && Object.keys(result.errors).length >= 3) {
+    throw new Error("Refresh failed for all kinds")
+  }
 }
 
 function dispatch(name, detail) {
@@ -479,4 +510,28 @@ export const debounce = (fn, ms = 180) => {
     clearTimeout(t)
     t = setTimeout(() => fn(...args), ms)
   }
+}
+
+/**
+ * Score a normalized string against query tokens. Returns 0 when any token
+ * fails to match. Higher score = better match. Mirrors the scoring used by
+ * `SearchView.svelte` so per-page search results rank consistently with
+ * the global Cmd+K search.
+ *
+ * Per token: `100 - matchPosition` (capped) + `25` if `norm` starts with the
+ * token. Summed across tokens.
+ *
+ * @param {string} norm Already normalized via `normalize()`.
+ * @param {string[]} tokens Already normalized + split.
+ * @returns {number}
+ */
+export function scoreNormMatch(norm, tokens) {
+  if (!norm || !tokens || !tokens.length) return 0
+  let score = 0
+  for (const token of tokens) {
+    const idx = norm.indexOf(token)
+    if (idx === -1) return 0
+    score += 100 - (idx > 99 ? 99 : idx) + (norm.startsWith(token) ? 25 : 0)
+  }
+  return score
 }

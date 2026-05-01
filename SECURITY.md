@@ -16,7 +16,7 @@ Only the **latest released version** is supported. Older versions don't receive 
 
 ## Reporting a vulnerability
 
-**Preferred:** open a private advisory at <https://github.com/infinitel8p/xtream/security/advisories/new>.
+**Preferred:** open a private advisory at <https://github.com/infinitel8p/Extreme-InfiniTV/security/advisories/new>.
 
 **Fallback:** email <admin@infinitel8p.com> with `xtream security` in the subject line.
 

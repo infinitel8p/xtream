@@ -9,22 +9,25 @@ import {
   IconCloudDownload,
   IconBrandGithub,
   IconDeviceFloppy,
+  IconDownload,
+  IconUpload,
+  IconHeart,
+  IconCoffee,
+  IconBrandPaypal,
 } from "@tabler/icons-svelte"
+import HiddenCategoriesEditor from "@/components/HiddenCategoriesEditor.svelte"
+import FavoritesReorder from "@/components/FavoritesReorder.svelte"
 ---
 
 <Layout pageTitle="Settings">
-  <main class="flex-1 min-h-0 overflow-auto custom-scroll">
+  <main class="flex-1 min-h-0 overflow-y-auto overflow-x-clip custom-scroll">
     <div
-      class="w-full max-w-3xl mx-auto px-4 md:px-6 lg:px-8 pt-6 sm:pt-10 pb-12
+      class="w-full max-w-480 mx-auto px-4 md:px-6 lg:px-8 pt-4 lg:pt-6 pb-12
              flex flex-col gap-8 sm:gap-10">
 
-    <header class="shrink-0 flex flex-col gap-2">
-      <h1
-        class="font-semibold tracking-[-0.02em] leading-[0.95]"
-        style="font-size: clamp(2.5rem, 3vw + 1.5rem, 4.5rem);">
-        Settings
-      </h1>
-      <p class="text-sm sm:text-base text-fg-3 max-w-prose">
+    <header class="route-hero shrink-0">
+      <h1 class="route-hero__title">Sett<em>i</em>ngs</h1>
+      <p class="route-hero__sub">
         Playlists, preferences, cache, and the app itself.
       </p>
     </header>
@@ -157,6 +160,34 @@ import {
           </div>
         </article>
 
+        <!-- EPG: time zone offset (per active playlist) -->
+        <article id="epg-tz-section" class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+          <div class="flex flex-col gap-1">
+            <h3 class="text-base font-semibold">EPG time zone</h3>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Some providers ship XMLTV with timestamps already shifted to the server's local time, so EPG times look off. Auto-detect picks the offset where the most channels have a programme airing right now.
+            </p>
+          </div>
+          <label class="flex flex-col gap-1.5">
+            <span class="text-eyebrow font-medium uppercase text-fg-3">
+              Offset for active playlist
+            </span>
+            <select
+              id="epg-tz-select"
+              disabled
+              class="rounded-xl border border-line bg-bg min-h-11 px-3 py-2 text-sm text-fg
+                     hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent
+                     disabled:opacity-60 disabled:cursor-not-allowed
+                     transition-colors">
+              <option value="auto">Auto-detect</option>
+            </select>
+          </label>
+          <div
+            id="epg-tz-status"
+            aria-live="polite"
+            class="text-xs text-fg-3"></div>
+        </article>
+
         <!-- Network: User-Agent spoofing -->
         <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
           <div class="flex flex-col gap-1">
@@ -199,6 +230,27 @@ import {
               id="ua-msg"
               aria-live="polite"
               class="text-xs text-fg-3 transition-opacity duration-300"></span>
+          </div>
+        </article>
+
+        <!-- Discord Rich Presence -->
+        <article id="discord-rpc-section" class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4 hidden">
+          <div class="flex flex-col gap-1">
+            <h3 class="text-base font-semibold">Discord Rich Presence</h3>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Show "Watching X on Extreme InfiniTV" on your Discord profile while you use the app. On by default; uncheck a playlist below to mute presence for that account. Desktop only - requires Discord running on the same machine.
+            </p>
+          </div>
+
+          <input id="discord-client-id" type="hidden" />
+
+          <div class="flex flex-col gap-2">
+            <span class="text-eyebrow font-medium uppercase text-fg-3">Per-playlist</span>
+            <div
+              id="discord-playlists"
+              class="flex flex-col divide-y divide-line/60 rounded-xl border border-line bg-bg overflow-hidden">
+              <div class="px-4 py-4 text-xs text-fg-3">No playlists yet.</div>
+            </div>
           </div>
         </article>
 
@@ -247,6 +299,25 @@ import {
 
           <div class="flex flex-col gap-1.5">
             <span class="text-eyebrow font-medium uppercase text-fg-3">
+              Restore from folder
+            </span>
+            <p class="text-xs text-fg-3 max-w-prose">
+              After a reinstall, scan the folder above for `.xtmeta.json` sidecars and re-add the matching files to your downloads list.
+            </p>
+            <div class="flex flex-wrap items-center gap-2">
+              <button id="downloads-scan" type="button" class="btn">
+                <IconRefresh aria-hidden="true" class="btn-icon" />
+                Scan folder
+              </button>
+              <span
+                id="downloads-scan-msg"
+                aria-live="polite"
+                class="text-xs text-fg-3 transition-opacity duration-300 empty:hidden"></span>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <span class="text-eyebrow font-medium uppercase text-fg-3">
               Concurrent downloads
             </span>
             <p class="text-xs text-fg-3 max-w-prose">
@@ -264,6 +335,56 @@ import {
               <button type="button" data-concurrency="3" aria-pressed="false" class="dl-concurrency-btn btn">3</button>
               <button type="button" data-concurrency="4" aria-pressed="false" class="dl-concurrency-btn btn">4</button>
             </div>
+            <p
+              id="settings-download-concurrency-cap"
+              class="text-2xs text-fg-3 tabular-nums empty:hidden"
+              aria-live="polite"></p>
+          </div>
+        </article>
+
+        <!-- Hidden categories editor -->
+        <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+          <div class="flex flex-col gap-1">
+            <h3 class="text-base font-semibold">Categories</h3>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Per-playlist mute list. Hidden categories are hidden from
+              the picker and the main grid on Live TV, Movies, and Series.
+            </p>
+          </div>
+          <HiddenCategoriesEditor client:load />
+        </article>
+
+        <!-- Favorites order -->
+        <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+          <div class="flex flex-col gap-1">
+            <h3 class="text-base font-semibold">Favorites</h3>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Reorder your favorites per kind. The hub Favorites strip and
+              the per-page favorites filter follow this order.
+            </p>
+          </div>
+          <FavoritesReorder client:load />
+        </article>
+
+        <!-- Backup / restore -->
+        <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+          <div class="flex flex-col gap-1">
+            <h3 class="text-base font-semibold">Backup</h3>
+            <p class="text-xs text-fg-3 max-w-prose">
+              Save all playlists, favorites, recents, watched progress, hidden categories, and app settings to a file. Cache and the downloads queue are not exported.
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 pt-1">
+            <button id="settings-export" type="button" class="btn">
+              <IconDownload aria-hidden="true" class="btn-icon" />
+              Export to file
+            </button>
+            <button id="settings-import" type="button" class="btn">
+              <IconUpload aria-hidden="true" class="btn-icon" />
+              Import from file
+            </button>
+            <input id="settings-import-input" type="file" accept="application/json,.json" hidden />
+            <span id="settings-backup-msg" aria-live="polite" class="text-xs text-fg-3 transition-opacity duration-300"></span>
           </div>
         </article>
 
@@ -359,9 +480,10 @@ import {
           </button>
           <a
             id="update-github"
-            href="https://github.com/infinitel8p/xtream/releases/latest"
+            href="https://github.com/infinitel8p/Extreme-InfiniTV/releases/latest"
             target="_blank"
             rel="noopener noreferrer"
+            data-external
             class="btn ml-auto text-fg-2">
             <IconBrandGithub aria-hidden="true" class="btn-icon" />
             GitHub
@@ -376,6 +498,56 @@ import {
       </article>
 
       <span id="app-version" class="hidden"></span>
+    </section>
+
+    <!-- Group: Support / donations -->
+    <section class="flex flex-col gap-3">
+      <h2 class="text-xs font-semibold uppercase tracking-widest text-fg-2">Support</h2>
+      <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+        <div class="flex items-start gap-3">
+          <span class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
+            <IconHeart aria-hidden="true" stroke={2} class="size-4" />
+          </span>
+          <div class="flex flex-col gap-1 min-w-0">
+            <h3 class="text-base font-semibold">Like the app?</h3>
+            <p class="text-sm text-fg-2 max-w-prose">
+              Extreme InfiniTV is free and open source. If it saves you time or sweetens your living-room setup, a small tip helps cover hosting, signing certs, and the next round of features.
+            </p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <a
+            href="https://github.com/sponsors/infinitel8p"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-external
+            class="btn justify-start sm:justify-center">
+            <IconBrandGithub aria-hidden="true" class="btn-icon" />
+            GitHub Sponsors
+          </a>
+          <a
+            href="https://ko-fi.com/infinitel8p"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-external
+            class="btn justify-start sm:justify-center">
+            <IconCoffee aria-hidden="true" class="btn-icon" />
+            Ko-fi
+          </a>
+          <a
+            href="https://www.paypal.com/paypalme/ludovicoferrara"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-external
+            class="btn justify-start sm:justify-center">
+            <IconBrandPaypal aria-hidden="true" class="btn-icon" />
+            PayPal
+          </a>
+        </div>
+        <p class="text-2xs text-fg-3">
+          No tracking, no ads, no telemetry - just a thank-you button.
+        </p>
+      </article>
     </section>
 
     <!-- Group: Danger zone (always last) -->
@@ -456,8 +628,14 @@ import {
       getEntries,
       refreshActive,
       isTauri,
+      loadCreds,
     } from "@/scripts/lib/creds.js"
-    import { getNewestCacheTime } from "@/scripts/lib/cache.js"
+    import {
+      getNewestCacheTimeAsync,
+      getCacheSizeAsync,
+      clearAll as clearAllCache,
+      hydrate as hydrateCache,
+    } from "@/scripts/lib/cache.js"
     import {
       renderPlaylistRow,
       PLAYLIST_LIST_EMPTY_COPY,
@@ -473,7 +651,30 @@ import {
       getDownloadConcurrency,
       setDownloadConcurrency,
     } from "@/scripts/lib/app-settings.js"
-    import { isDownloadable } from "@/scripts/lib/downloads.js"
+    import {
+      ensureUserInfo,
+      getMaxConnectionsSync,
+      getActiveConnectionsSync,
+      USER_INFO_LOADED_EVENT,
+    } from "@/scripts/lib/account-info.js"
+    import { isDownloadable, scanDownloadsFolder } from "@/scripts/lib/downloads.js"
+    import {
+      getDiscordClientId,
+      setDiscordClientId,
+      isDiscordEnabledForPlaylist,
+      setDiscordEnabledForPlaylist,
+      DISCORD_RPC_EVENT,
+    } from "@/scripts/lib/app-settings.js"
+    import { discordRpcSupported } from "@/scripts/lib/discord-rpc.js"
+    import { bindExternalLinks } from "@/scripts/lib/external-link.js"
+
+    bindExternalLinks()
+    import { toastSuccess, toastError } from "@/scripts/lib/toast.js"
+    import {
+      getOffsetSetting,
+      setOffsetSetting,
+      getProgrammesSync,
+    } from "@/scripts/lib/epg-data.js"
 
     injectVersion()
 
@@ -596,6 +797,15 @@ import {
         return
       }
 
+      await Promise.all(
+        entries.flatMap((e) => [
+          hydrateCache(e._id, "live"),
+          hydrateCache(e._id, "m3u"),
+          hydrateCache(e._id, "vod"),
+          hydrateCache(e._id, "series"),
+        ])
+      )
+
       const frag = document.createDocumentFragment()
       for (const e of entries) {
         frag.appendChild(
@@ -612,28 +822,17 @@ import {
       else refreshBtn?.classList.add("hidden")
     }
 
-    function syncCache() {
-      let bytes = 0
-      let entries = 0
+    async function syncCache() {
       try {
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i)
-          if (!k || !k.startsWith("xt_cache:")) continue
-          const v = localStorage.getItem(k) || ""
-          // Approximate - UTF-16 code units in localStorage; doubling gives
-          // closer-to-actual byte count.
-          bytes += k.length + v.length * 2
-          entries++
-        }
+        const bytes = await getCacheSizeAsync()
+        if (cacheSizeEl) cacheSizeEl.textContent = fmtBytes(bytes)
+        if (clearCacheBtn) clearCacheBtn.disabled = bytes === 0
       } catch {}
-      if (cacheSizeEl) cacheSizeEl.textContent = fmtBytes(bytes)
-      if (clearCacheBtn) clearCacheBtn.disabled = entries === 0
-
-      ;(async () => {
+      try {
         const a = await getActiveEntry()
-        const newest = a ? getNewestCacheTime(a._id) : null
+        const newest = a ? await getNewestCacheTimeAsync(a._id) : null
         if (cacheNewestEl) cacheNewestEl.textContent = fmtAge(newest)
-      })()
+      } catch {}
     }
 
     refreshBtn?.addEventListener("click", async () => {
@@ -642,47 +841,167 @@ import {
       try {
         await refreshActive()
         ok = true
+      } catch (e) {
+        toastError("Couldn't refresh playlist", {
+          description: (e && e.message) || "Check your connection or login.",
+          duration: 6000,
+        })
       } finally {
         setLoading(refreshBtn, false)
         syncCache()
-        if (ok) flashSuccess(refreshBtn)
+        if (ok) {
+          flashSuccess(refreshBtn)
+          toastSuccess("Playlist refreshed")
+        }
       }
     })
 
-    clearCacheBtn?.addEventListener("click", () => {
+    clearCacheBtn?.addEventListener("click", async () => {
       setLoading(clearCacheBtn, true)
       let removed = 0
       let ok = false
       try {
-        const toRemove = []
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i)
-          if (k && (k.startsWith("xt_cache:") || k === "xt_cache_meta"))
-            toRemove.push(k)
-        }
-        for (const k of toRemove) localStorage.removeItem(k)
-        try {
-          const sessRemove = []
-          for (let i = 0; i < sessionStorage.length; i++) {
-            const k = sessionStorage.key(i)
-            if (k && k.startsWith("xt_cache:")) sessRemove.push(k)
-          }
-          for (const k of sessRemove) sessionStorage.removeItem(k)
-        } catch {}
-        removed = toRemove.length
+        removed = await clearAllCache()
         ok = true
-        flashMsg(
-          cacheMsgEl,
-          removed === 0
-            ? "Cache was already empty."
-            : `Cleared ${removed} ${removed === 1 ? "entry" : "entries"}.`
-        )
+        if (removed > 0) {
+          toastSuccess("Cache cleared", {
+            description: `${removed} ${removed === 1 ? "entry" : "entries"} removed.`,
+          })
+        } else {
+          // Quiet inline message - not worth a toast for a no-op.
+          flashMsg(cacheMsgEl, "Cache was already empty.")
+        }
       } catch {
-        flashMsg(cacheMsgEl, "Couldn't clear cache.")
+        toastError("Couldn't clear cache")
       } finally {
         setLoading(clearCacheBtn, false)
         syncCache()
         if (ok && removed > 0) flashSuccess(clearCacheBtn)
+      }
+    })
+
+    // -------------------------
+    // Backup: export / import
+    // -------------------------
+    const exportBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("settings-export"))
+    const importBtn = /** @type {HTMLButtonElement|null} */ (document.getElementById("settings-import"))
+    const importInput = /** @type {HTMLInputElement|null} */ (document.getElementById("settings-import-input"))
+    const backupMsgEl = document.getElementById("settings-backup-msg")
+
+    async function downloadBlobWeb(name, content) {
+      const blob = new Blob([content], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = name
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 5000)
+    }
+
+    exportBtn?.addEventListener("click", async () => {
+      setLoading(exportBtn, true)
+      try {
+        const { exportAll, suggestedFilename } = await import("@/scripts/lib/backup.js")
+        const snapshot = await exportAll()
+        const json = JSON.stringify(snapshot, null, 2)
+        const filename = suggestedFilename()
+        if (isTauri) {
+          try {
+            const { save } = await import("@tauri-apps/plugin-dialog")
+            const target = await save({
+              defaultPath: filename,
+              filters: [{ name: "JSON", extensions: ["json"] }],
+            })
+            if (!target) {
+              setLoading(exportBtn, false)
+              return
+            }
+            const { writeTextFile } = await import("@tauri-apps/plugin-fs")
+            await writeTextFile(target, json)
+          } catch (e) {
+            console.error("[settings:export] tauri save failed:", e)
+            await downloadBlobWeb(filename, json)
+          }
+        } else {
+          await downloadBlobWeb(filename, json)
+        }
+        toastSuccess("Backup exported", {
+          description: `${snapshot.creds.entries.length} playlist(s).`,
+        })
+        flashMsg(backupMsgEl, "Saved.")
+      } catch (e) {
+        console.error("[settings:export] failed:", e)
+        toastError("Couldn't export backup", {
+          description: (e && e.message) || "See console.",
+        })
+      } finally {
+        setLoading(exportBtn, false)
+      }
+    })
+
+    async function applyImport(text) {
+      const ok = window.confirm(
+        "Import will replace all playlists, favorites, recents, watched progress, hidden categories, and app settings on this device. Continue?"
+      )
+      if (!ok) return
+      let parsed
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        toastError("Couldn't parse backup file", {
+          description: "Not valid JSON.",
+        })
+        return
+      }
+      try {
+        const { importAll } = await import("@/scripts/lib/backup.js")
+        const summary = await importAll(parsed)
+        toastSuccess("Backup restored", {
+          description: `${summary.playlists} playlist(s), ${summary.prefsPlaylists} preference set(s).`,
+          duration: 6000,
+        })
+        flashMsg(backupMsgEl, "Imported.")
+        // Force a hub/sidebar refresh by re-rendering playlists.
+        await renderPlaylists()
+        syncCache()
+      } catch (e) {
+        toastError("Couldn't restore backup", {
+          description: (e && e.message) || "See console.",
+        })
+      }
+    }
+
+    importBtn?.addEventListener("click", async () => {
+      if (isTauri) {
+        try {
+          const { open } = await import("@tauri-apps/plugin-dialog")
+          const picked = await open({
+            multiple: false,
+            directory: false,
+            filters: [{ name: "JSON", extensions: ["json"] }],
+          })
+          if (!picked || typeof picked !== "string") return
+          const { readTextFile } = await import("@tauri-apps/plugin-fs")
+          const text = await readTextFile(picked)
+          await applyImport(text)
+          return
+        } catch (e) {
+          console.warn("[settings:import] tauri open failed, falling back:", e)
+        }
+      }
+      importInput?.click()
+    })
+
+    importInput?.addEventListener("change", async () => {
+      const file = importInput?.files?.[0]
+      if (!file) return
+      try {
+        const text = await file.text()
+        await applyImport(text)
+      } finally {
+        if (importInput) importInput.value = ""
       }
     })
 
@@ -711,6 +1030,7 @@ import {
       if (!resetConfirmBtn) return
       setLoading(resetConfirmBtn, true)
       try {
+        try { await clearAllCache() } catch {}
         try { localStorage.clear() } catch {}
         try { sessionStorage.clear() } catch {}
         try {
@@ -754,6 +1074,10 @@ import {
       syncCache()
     })
     document.addEventListener("xt:entries-updated", () => {
+      renderPlaylists()
+      syncCache()
+    })
+    document.addEventListener("xt:catalog-warmed", () => {
       renderPlaylists()
       syncCache()
     })
@@ -904,6 +1228,71 @@ import {
     syncChannelWidthButtons()
 
     // ---------------------------------------------------------------------
+    // EPG time zone offset (per active playlist)
+    // ---------------------------------------------------------------------
+    const tzSelect = /** @type {HTMLSelectElement|null} */ (
+      document.getElementById("epg-tz-select")
+    )
+    const tzStatus = document.getElementById("epg-tz-status")
+    if (tzSelect) {
+      tzSelect.replaceChildren()
+      const autoOpt = document.createElement("option")
+      autoOpt.value = "auto"
+      autoOpt.textContent = "Auto-detect"
+      tzSelect.appendChild(autoOpt)
+      for (let mins = -12 * 60; mins <= 14 * 60; mins += 30) {
+        const sign = mins < 0 ? "-" : "+"
+        const abs = Math.abs(mins)
+        const h = Math.floor(abs / 60)
+        const m = abs % 60
+        const label = `UTC${sign}${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
+        const opt = document.createElement("option")
+        opt.value = String(mins)
+        opt.textContent = label
+        tzSelect.appendChild(opt)
+      }
+    }
+
+    let tzActiveId = ""
+    async function syncTz() {
+      const active = await getActiveEntry()
+      if (!tzSelect || !tzStatus) return
+      if (!active) {
+        tzActiveId = ""
+        tzSelect.disabled = true
+        tzSelect.value = "auto"
+        tzStatus.textContent = "No playlist selected."
+        return
+      }
+      tzActiveId = active._id
+      tzSelect.disabled = false
+      const setting = getOffsetSetting(active._id)
+      tzSelect.value = setting === "auto" ? "auto" : String(setting)
+      const state = getProgrammesSync(active._id)
+      if (state) {
+        const sign = state.offsetMin < 0 ? "-" : "+"
+        const abs = Math.abs(state.offsetMin)
+        const label = `UTC${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`
+        tzStatus.textContent = state.offsetIsAuto
+          ? `Auto-detected ${label}.`
+          : `Using manual ${label}.`
+      } else {
+        tzStatus.textContent =
+          "EPG hasn't been loaded for this playlist yet - open Live TV or the EPG grid first."
+      }
+    }
+    tzSelect?.addEventListener("change", () => {
+      if (!tzActiveId) return
+      const raw = tzSelect.value
+      setOffsetSetting(tzActiveId, raw === "auto" ? "auto" : Number(raw))
+      if (tzStatus) tzStatus.textContent = "Saved. Applies next time EPG loads."
+    })
+    document.addEventListener("xt:active-changed", syncTz)
+    document.addEventListener("xt:epg-loaded", syncTz)
+    document.addEventListener("xt:epg-offset-changed", syncTz)
+    syncTz()
+
+    // ---------------------------------------------------------------------
     // Network / User-Agent
     // ---------------------------------------------------------------------
     const uaPresetEl = /** @type {HTMLSelectElement|null} */ (
@@ -1051,6 +1440,49 @@ import {
       }
     })
 
+    const scanBtn = /** @type {HTMLButtonElement|null} */ (
+      document.getElementById("downloads-scan")
+    )
+    const scanMsgEl = document.getElementById("downloads-scan-msg")
+    if (!isDownloadable() || isAndroid) {
+      scanBtn?.setAttribute("disabled", "")
+      if (scanBtn) {
+        scanBtn.classList.add("opacity-50", "cursor-not-allowed")
+        scanBtn.title = "Folder scan is desktop-only."
+      }
+    }
+    scanBtn?.addEventListener("click", async () => {
+      if (!scanBtn) return
+      setLoading(scanBtn, true)
+      try {
+        const summary = await scanDownloadsFolder()
+        if (summary.error) {
+          toastError("Couldn't scan folder", { description: summary.error })
+          flashMsg(scanMsgEl, summary.error)
+        } else if (summary.imported > 0) {
+          toastSuccess(`Imported ${summary.imported} download${summary.imported === 1 ? "" : "s"}`, {
+            description: `Scanned ${summary.scanned} sidecar${summary.scanned === 1 ? "" : "s"}.`,
+          })
+          flashMsg(scanMsgEl, `Imported ${summary.imported} item(s).`)
+          flashSuccess(scanBtn)
+        } else if (summary.scanned === 0) {
+          flashMsg(scanMsgEl, "No `.xtmeta.json` sidecars found in this folder.")
+        } else {
+          flashMsg(
+            scanMsgEl,
+            `Already up to date. ${summary.skipped} skipped, ${summary.missing} missing media.`
+          )
+        }
+      } catch (error) {
+        console.error("[settings:scan] failed:", error)
+        toastError("Couldn't scan folder", {
+          description: (error && error.message) || "See console.",
+        })
+      } finally {
+        setLoading(scanBtn, false)
+      }
+    })
+
     dirClearBtn?.addEventListener("click", async () => {
       const prev = getDownloadDir()
       if (isAndroid && prev) {
@@ -1067,12 +1499,50 @@ import {
     const concurrencyGroup = document.getElementById(
       "settings-download-concurrency"
     )
+    const concurrencyCapEl = document.getElementById(
+      "settings-download-concurrency-cap"
+    )
+
+    function readProviderCap() {
+      // 0 means "unknown" (M3U source or cache cold). UI falls back to the
+      // previous behaviour: all four buttons enabled, no cap message.
+      const active = JSON.parse(
+        localStorage.getItem("xt_playlists") || '{"selectedId":""}'
+      )
+      return getMaxConnectionsSync(active?.selectedId || "")
+    }
+    function readActiveCons() {
+      const active = JSON.parse(
+        localStorage.getItem("xt_playlists") || '{"selectedId":""}'
+      )
+      return getActiveConnectionsSync(active?.selectedId || "")
+    }
+
     function syncConcurrencyButtons() {
       if (!concurrencyGroup) return
       const current = getDownloadConcurrency()
+      const cap = readProviderCap()
       for (const btn of concurrencyGroup.querySelectorAll(".dl-concurrency-btn")) {
         const v = parseInt(btn.getAttribute("data-concurrency") || "1", 10)
         btn.setAttribute("aria-pressed", v === current ? "true" : "false")
+        const exceedsCap = cap > 0 && v > cap
+        btn.disabled = exceedsCap
+        btn.classList.toggle("opacity-50", exceedsCap)
+        btn.classList.toggle("cursor-not-allowed", exceedsCap)
+        btn.title = exceedsCap
+          ? `Your provider only allows ${cap} connection${cap === 1 ? "" : "s"}.`
+          : ""
+      }
+      if (concurrencyCapEl) {
+        if (cap <= 0) {
+          concurrencyCapEl.textContent = ""
+        } else {
+          const activeCons = readActiveCons()
+          const slots = `${cap} connection${cap === 1 ? "" : "s"}`
+          concurrencyCapEl.textContent = activeCons > 0
+            ? `Provider allows ${slots} (${activeCons} in use).`
+            : `Provider allows ${slots}.`
+        }
       }
     }
     syncConcurrencyButtons()
@@ -1080,11 +1550,31 @@ import {
       const btn = /** @type {HTMLElement} */ (e.target).closest(
         ".dl-concurrency-btn"
       )
-      if (!btn) return
+      if (!btn || btn.disabled) return
       const v = parseInt(btn.getAttribute("data-concurrency") || "1", 10)
       setDownloadConcurrency(v)
       syncConcurrencyButtons()
     })
+
+    // Refresh user_info on every active-playlist change and on Settings load
+    // so the cap reflects the current provider, not whatever was warmed last.
+    async function refreshUserInfoForActive() {
+      try {
+        const active = await getActiveEntry()
+        if (!active) {
+          syncConcurrencyButtons()
+          return
+        }
+        const creds = await loadCreds()
+        await ensureUserInfo(creds, active._id)
+        syncConcurrencyButtons()
+      } catch {
+        syncConcurrencyButtons()
+      }
+    }
+    refreshUserInfoForActive()
+    document.addEventListener(USER_INFO_LOADED_EVENT, syncConcurrencyButtons)
+    document.addEventListener("xt:active-changed", refreshUserInfoForActive)
 
     const updateSectionEl = document.getElementById("update-section")
     const updatePillEl = document.getElementById("update-pill")
@@ -1111,7 +1601,7 @@ import {
     const updateProgressText = document.getElementById("update-progress-text")
 
     const GITHUB_RELEASES_URL =
-      "https://github.com/infinitel8p/xtream/releases"
+      "https://github.com/infinitel8p/Extreme-InfiniTV/releases"
 
     function setUpdateState(state) {
       if (updateSectionEl) updateSectionEl.setAttribute("data-state", state)
@@ -1299,5 +1789,86 @@ import {
     updateRelaunchBtn?.addEventListener("click", relaunchApp)
 
     if (isWindowsDesktop) checkForUpdates()
+
+    // -------------------------------------------------------------------
+    // Discord Rich Presence
+    // -------------------------------------------------------------------
+    const discordSection = document.getElementById("discord-rpc-section")
+    const discordClientIdInput = /** @type {HTMLInputElement|null} */ (
+      document.getElementById("discord-client-id")
+    )
+    const discordPlaylistsEl = document.getElementById("discord-playlists")
+
+    if (discordSection && discordRpcSupported) {
+      discordSection.classList.remove("hidden")
+    }
+    if (discordClientIdInput) {
+      discordClientIdInput.value = getDiscordClientId()
+      let saveTimer = null
+      discordClientIdInput.addEventListener("input", () => {
+        if (saveTimer) window.clearTimeout(saveTimer)
+        saveTimer = window.setTimeout(() => {
+          setDiscordClientId(discordClientIdInput.value)
+        }, 350)
+      })
+      discordClientIdInput.addEventListener("blur", () => {
+        if (saveTimer) {
+          window.clearTimeout(saveTimer)
+          saveTimer = null
+        }
+        setDiscordClientId(discordClientIdInput.value)
+      })
+    }
+
+    async function renderDiscordPlaylists() {
+      if (!discordPlaylistsEl) return
+      const entries = await getEntries()
+      if (!entries.length) {
+        discordPlaylistsEl.innerHTML =
+          '<div class="px-4 py-4 text-xs text-fg-3">No playlists yet.</div>'
+        return
+      }
+      const frag = document.createDocumentFragment()
+      for (const entry of entries) {
+        const row = document.createElement("label")
+        row.className =
+          "flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-2 transition-colors cursor-pointer"
+        const labelWrap = document.createElement("div")
+        labelWrap.className = "flex flex-col gap-0.5 min-w-0"
+        const title = document.createElement("span")
+        title.className = "truncate text-sm font-medium text-fg"
+        title.textContent = entry.title || "(untitled)"
+        const sub = document.createElement("span")
+        sub.className = "truncate text-2xs text-fg-3"
+        sub.textContent = entry.type === "m3u" ? "M3U source" : "Xtream"
+        labelWrap.append(title, sub)
+        row.appendChild(labelWrap)
+
+        const toggle = document.createElement("input")
+        toggle.type = "checkbox"
+        toggle.className = "size-5 accent-accent"
+        toggle.checked = isDiscordEnabledForPlaylist(entry._id)
+        toggle.setAttribute(
+          "aria-label",
+          `Show Discord presence for ${entry.title || "this playlist"}`
+        )
+        toggle.addEventListener("change", () => {
+          setDiscordEnabledForPlaylist(entry._id, toggle.checked)
+        })
+        row.appendChild(toggle)
+        frag.appendChild(row)
+      }
+      discordPlaylistsEl.replaceChildren(frag)
+    }
+
+    renderDiscordPlaylists()
+    document.addEventListener("xt:entries-updated", renderDiscordPlaylists)
+    document.addEventListener(DISCORD_RPC_EVENT, () => {
+      // Keep the input in sync if the value changed elsewhere.
+      if (discordClientIdInput) {
+        const next = getDiscordClientId()
+        if (discordClientIdInput.value !== next) discordClientIdInput.value = next
+      }
+    })
   </script>
 </Layout>
