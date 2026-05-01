@@ -1028,33 +1028,91 @@ const ensurePlayer = async () => {
   return vjs
 }
 
+function showTuningOverlay(logoUrl) {
+  const playerWrap = document.getElementById("player")?.parentElement
+  if (!playerWrap) return
+  playerWrap.querySelector("[data-tuning-overlay]")?.remove()
+  const overlay = document.createElement("div")
+  overlay.dataset.tuningOverlay = ""
+  overlay.className = "tuning-overlay"
+  overlay.style.viewTransitionName = "tuning-logo"
+  if (logoUrl) {
+    const img = document.createElement("img")
+    img.src = logoUrl
+    img.alt = ""
+    img.referrerPolicy = "no-referrer"
+    img.decoding = "async"
+    overlay.appendChild(img)
+  }
+  playerWrap.appendChild(overlay)
+  setTimeout(() => {
+    overlay.classList.add("tuning-overlay--leaving")
+    setTimeout(() => overlay.remove(), 380)
+  }, 480)
+}
+
+function runScanLineSweep() {
+  const playerWrap = document.getElementById("player")?.parentElement
+  if (!playerWrap) return
+  playerWrap.classList.remove("scan-line-sweep")
+  void playerWrap.offsetWidth
+  playerWrap.classList.add("scan-line-sweep")
+  setTimeout(() => playerWrap.classList.remove("scan-line-sweep"), 720)
+}
+
 async function play(streamId, name) {
   if (!currentEl) return
   const src = hasDirectUrl(streamId)
     ? getDirectUrl(streamId)
     : buildDirectM3U8(streamId)
 
-  setNowPlaying(streamId)
-
   if (activePlaylistId) {
     const ch = all.find((c) => c.id === streamId)
     pushRecent(activePlaylistId, "live", streamId, name, ch?.logo || null)
   }
 
-  currentEl.replaceChildren()
-  const wrap = document.createElement("div")
-  wrap.className = "flex items-center gap-2 max-w-[calc(100%-4rem)]"
-  wrap.innerHTML =
-    '<span class="status-badge status-badge--live">ON</span>'
-  const label = document.createElement("span")
-  label.className = "truncate w-full"
-  label.append(`Channel ${streamId}: `)
-  const nameEl = document.createElement("span")
-  nameEl.className = "text-accent"
-  nameEl.textContent = name
-  label.appendChild(nameEl)
-  wrap.appendChild(label)
-  currentEl.appendChild(wrap)
+  const channel = all.find((c) => c.id === streamId)
+  const channelLogo = channel?.logo ? safeHttpUrl(channel.logo) : null
+
+  const sourceLogo = viewport?.querySelector(
+    `.channel-row[data-idx="${filtered.findIndex((c) => c.id === streamId)}"] .play-btn > div:first-child`
+  )
+  const supportsVT = typeof document.startViewTransition === "function"
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+  if (supportsVT && !reduceMotion && sourceLogo instanceof HTMLElement) {
+    sourceLogo.style.viewTransitionName = "tuning-logo"
+  }
+
+  const swapState = () => {
+    setNowPlaying(streamId)
+
+    currentEl.replaceChildren()
+    const wrap = document.createElement("div")
+    wrap.className = "flex items-center gap-2 max-w-[calc(100%-4rem)]"
+    wrap.innerHTML =
+      '<span class="status-badge status-badge--live">ON</span>'
+    const label = document.createElement("span")
+    label.className = "truncate w-full"
+    label.append(`Channel ${streamId}: `)
+    const nameEl = document.createElement("span")
+    nameEl.className = "text-accent"
+    nameEl.textContent = name
+    label.appendChild(nameEl)
+    wrap.appendChild(label)
+    currentEl.appendChild(wrap)
+
+    showTuningOverlay(channelLogo)
+    runScanLineSweep()
+  }
+
+  if (supportsVT && !reduceMotion) {
+    const transition = document.startViewTransition(() => swapState())
+    transition.finished.finally(() => {
+      if (sourceLogo instanceof HTMLElement) sourceLogo.style.viewTransitionName = ""
+    })
+  } else {
+    swapState()
+  }
 
   document.getElementById("player")?.removeAttribute("hidden")
   const player = await ensurePlayer()

@@ -102,7 +102,11 @@ import {
 					focus-visible:border-accent focus-visible:bg-surface-2
 					hover:transform-[translateY(-2px)]
 					focus-visible:transform-[translateY(-2px)]">
-				<div class="flex items-start justify-between gap-4">
+				<div
+					id="livetv-tile-art"
+					class="tile-art pointer-events-none"
+					aria-hidden="true"></div>
+				<div class="relative flex items-start justify-between gap-4 z-10">
 					<IconDeviceTv
 						aria-hidden="true"
 						stroke={1}
@@ -114,7 +118,7 @@ import {
 						aria-hidden="true">
 					</p>
 				</div>
-				<div class="mt-auto pt-6">
+				<div class="relative mt-auto pt-6 z-10">
 					<h2
 						class="font-semibold tracking-[-0.02em] leading-[0.92] text-fg
 							group-hover:text-accent group-focus-visible:text-accent
@@ -122,7 +126,9 @@ import {
 						style="font-size: clamp(3rem, 6vw + 1.5rem, 8.5rem);">
 						Live TV
 					</h2>
-					<p class="mt-4 sm:mt-5 text-sm sm:text-base text-fg-2 max-w-md font-sans tracking-tight">
+					<p
+						id="livetv-tile-sub"
+						class="mt-4 sm:mt-5 text-sm sm:text-base text-fg-2 max-w-md font-sans tracking-tight truncate">
 						Channels, and what's on right now.
 					</p>
 				</div>
@@ -132,7 +138,7 @@ import {
 				href="/movies"
 				aria-label="Browse Movies"
 				style="animation-delay: 150ms;"
-				class="tile-enter group flex flex-col justify-between
+				class="tile-enter group relative overflow-hidden flex flex-col justify-between
 					rounded-2xl border border-line bg-surface
 					p-5 sm:p-6
 					min-h-28 landscape:min-h-0 lg:min-h-0
@@ -141,12 +147,16 @@ import {
 					focus-visible:border-accent focus-visible:bg-surface-2
 					hover:transform-[translateY(-2px)]
 					focus-visible:transform-[translateY(-2px)]">
+				<div
+					id="movies-tile-art"
+					class="tile-art pointer-events-none"
+					aria-hidden="true"></div>
 				<IconMovie
 					aria-hidden="true"
 					stroke={1.25}
-					class="size-9 sm:size-10 lg:size-12 text-fg-3 transition-colors duration-200 group-hover:text-accent group-focus-visible:text-accent"
+					class="relative z-10 size-9 sm:size-10 lg:size-12 text-fg-3 transition-colors duration-200 group-hover:text-accent group-focus-visible:text-accent"
 				/>
-				<div class="mt-auto pt-4">
+				<div class="relative z-10 mt-auto pt-4">
 					<h2 class="text-2xl sm:text-3xl lg:text-5xl font-semibold tracking-[-0.02em] leading-[0.95]
 						text-fg group-hover:text-accent group-focus-visible:text-accent
 						transition-colors duration-200 ms-[-0.05em]">
@@ -162,7 +172,7 @@ import {
 				href="/series"
 				aria-label="Browse Series"
 				style="animation-delay: 250ms;"
-				class="tile-enter group flex flex-col justify-between
+				class="tile-enter group relative overflow-hidden flex flex-col justify-between
 					rounded-2xl border border-line bg-surface
 					p-5 sm:p-6
 					min-h-28 landscape:min-h-0 lg:min-h-0
@@ -171,12 +181,16 @@ import {
 					focus-visible:border-accent focus-visible:bg-surface-2
 					hover:transform-[translateY(-2px)]
 					focus-visible:transform-[translateY(-2px)]">
+				<div
+					id="series-tile-art"
+					class="tile-art pointer-events-none"
+					aria-hidden="true"></div>
 				<IconStack2
 					aria-hidden="true"
 					stroke={1.25}
-					class="size-9 sm:size-10 lg:size-12 text-fg-3 transition-colors duration-200 group-hover:text-accent group-focus-visible:text-accent"
+					class="relative z-10 size-9 sm:size-10 lg:size-12 text-fg-3 transition-colors duration-200 group-hover:text-accent group-focus-visible:text-accent"
 				/>
-				<div class="mt-auto pt-4">
+				<div class="relative z-10 mt-auto pt-4">
 					<h2 class="text-2xl sm:text-3xl lg:text-5xl font-semibold tracking-[-0.02em] leading-[0.95]
 						text-fg group-hover:text-accent group-focus-visible:text-accent
 						transition-colors duration-200 ms-[-0.05em]">
@@ -213,11 +227,18 @@ import {
 	html[data-first-run="true"] #welcome {
 		display: flex;
 	}
+
+	/* tile-art / tile-art__layer rules live in global.css because the layers
+	   are created at runtime by index.astro's script and Astro's scoped
+	   styles only apply to markup-time class names. */
 </style>
 
 <script>
 	import "../scripts/updater-startup.js";
-	import { getEntries } from "@/scripts/lib/creds.js";
+	import { getEntries, getActiveEntry, loadCreds } from "@/scripts/lib/creds.js";
+	import { getCached, hydrate as hydrateCache } from "@/scripts/lib/cache.js";
+	import { getRecents, ensureLoaded as ensurePrefsLoaded } from "@/scripts/lib/preferences.js";
+	import { getProgrammesSync, getNowNext, loadProgrammes } from "@/scripts/lib/epg-data.js";
 
 	const eyebrow = document.getElementById("hero-eyebrow");
 	if (eyebrow) {
@@ -258,4 +279,175 @@ import {
 
 	document.addEventListener("xt:entries-updated", reconcileFirstRun);
 	document.addEventListener("xt:active-changed", reconcileFirstRun);
+
+	// ──────────────────────────────────────────────────────────
+	// Hub dashboard signals
+	// ──────────────────────────────────────────────────────────
+	const liveTileArt = document.getElementById("livetv-tile-art");
+	const liveTileSub = document.getElementById("livetv-tile-sub");
+	const moviesTileArt = document.getElementById("movies-tile-art");
+	const seriesTileArt = document.getElementById("series-tile-art");
+
+	let rotatorTimer = null;
+	function stopRotator() {
+		if (rotatorTimer) {
+			clearInterval(rotatorTimer);
+			rotatorTimer = null;
+		}
+	}
+
+	function startRotator(el, urls) {
+		if (!el || !urls.length) return;
+		const layers = [document.createElement("img"), document.createElement("img")];
+		for (const layer of layers) {
+			layer.className = "tile-art__layer";
+			layer.alt = "";
+			layer.decoding = "async";
+			layer.loading = "eager";
+			layer.referrerPolicy = "no-referrer";
+			layer.onerror = () => {
+				delete layer.dataset.on;
+			};
+			el.appendChild(layer);
+		}
+		let idx = 0;
+		let active = 0;
+		layers[active].src = urls[0];
+		layers[active].dataset.on = "true";
+		const advance = () => {
+			idx = (idx + 1) % urls.length;
+			const next = active === 0 ? 1 : 0;
+			layers[next].src = urls[idx];
+			layers[next].dataset.on = "true";
+			delete layers[active].dataset.on;
+			active = next;
+		};
+		const interval = setInterval(advance, 8000);
+		rotatorTimer = interval;
+	}
+
+	function pickRandom(arr, count) {
+		if (arr.length <= count) return arr.slice();
+		const seen = new Set();
+		const out = [];
+		while (out.length < count && seen.size < arr.length) {
+			const idx = Math.floor(Math.random() * arr.length);
+			if (seen.has(idx)) continue;
+			seen.add(idx);
+			out.push(arr[idx]);
+		}
+		return out;
+	}
+
+	async function setupTileArt() {
+		try {
+			stopRotator();
+			const active = await getActiveEntry();
+			if (!active) return;
+			await Promise.all([
+				hydrateCache(active._id, "vod").catch(() => {}),
+				hydrateCache(active._id, "series").catch(() => {}),
+				hydrateCache(active._id, "live").catch(() => {}),
+				hydrateCache(active._id, "m3u").catch(() => {}),
+			]);
+			if (moviesTileArt) {
+				const vod = (getCached(active._id, "vod")?.data || [])
+					.filter((m) => m && m.logo)
+					.map((m) => m.logo);
+				const picks = pickRandom(vod, 6);
+				moviesTileArt.replaceChildren();
+				if (picks.length) startRotator(moviesTileArt, picks);
+			}
+			if (seriesTileArt) {
+				const series = (getCached(active._id, "series")?.data || [])
+					.filter((s) => s && s.logo)
+					.map((s) => s.logo);
+				const picks = pickRandom(series, 6);
+				seriesTileArt.replaceChildren();
+				if (picks.length) startRotator(seriesTileArt, picks);
+			}
+			await setupLiveSignals(active);
+		} catch (e) {
+			console.warn("[hub] setupTileArt failed:", e);
+		}
+	}
+
+	async function setupLiveSignals(active) {
+		if (!liveTileArt || !liveTileSub) return;
+		await ensurePrefsLoaded();
+		const recents = getRecents(active._id, "live") || [];
+		const live = (getCached(active._id, "live")?.data || getCached(active._id, "m3u")?.data || []);
+		const liveById = new Map(live.map((c) => [Number(c.id), c]));
+		let lastChannel = null;
+		if (recents.length) {
+			lastChannel = liveById.get(Number(recents[0].id)) || {
+				id: recents[0].id,
+				name: recents[0].name,
+				logo: recents[0].logo,
+				tvgId: null,
+			};
+		} else if (live.length) {
+			lastChannel = live[0];
+		}
+		liveTileArt.replaceChildren();
+		if (!lastChannel) {
+			liveTileSub.textContent = "Channels, and what's on right now.";
+			return;
+		}
+		if (lastChannel.logo) {
+			const layer = document.createElement("img");
+			layer.className = "tile-art__layer tile-art__layer--logo";
+			layer.alt = "";
+			layer.decoding = "async";
+			layer.loading = "eager";
+			layer.referrerPolicy = "no-referrer";
+			layer.onerror = () => layer.remove();
+			layer.src = lastChannel.logo;
+			layer.dataset.on = "true";
+			liveTileArt.appendChild(layer);
+		}
+		const tvgId = lastChannel.tvgId || "";
+		const setOnAir = (programme) => {
+			if (!programme) return false;
+			liveTileSub.innerHTML =
+				`<span class="text-fg-3 uppercase tracking-wider text-eyebrow font-semibold mr-2">On now</span>` +
+				`<span class="text-fg-2">${escapeHtml(lastChannel.name)}</span>` +
+				`<span class="text-fg-3 mx-1.5">·</span>` +
+				`<span class="text-fg">${escapeHtml(programme.title)}</span>`;
+			return true;
+		};
+		const cached = getProgrammesSync(active._id);
+		const cachedHit = cached?.programmes && tvgId
+			? setOnAir(getNowNext(cached.programmes, tvgId).current)
+			: false;
+		if (!cachedHit) {
+			liveTileSub.textContent = `Last watched: ${lastChannel.name}`;
+			if (tvgId) {
+				try {
+					const creds = await loadCreds();
+					if (creds?.host) {
+						const state = await loadProgrammes(active._id, creds);
+						if (state?.programmes) {
+							const { current } = getNowNext(state.programmes, tvgId);
+							if (current) setOnAir(current);
+						}
+					}
+				} catch {}
+			}
+		}
+	}
+
+	function escapeHtml(s) {
+		const d = document.createElement("div");
+		d.textContent = s || "";
+		return d.innerHTML;
+	}
+
+	if (typeof window !== "undefined") {
+		window.requestIdleCallback
+			? window.requestIdleCallback(setupTileArt, { timeout: 1500 })
+			: setTimeout(setupTileArt, 400);
+		document.addEventListener("xt:active-changed", setupTileArt);
+		document.addEventListener("xt:catalog-warmed", setupTileArt);
+	}
 </script>

@@ -147,6 +147,14 @@
             <div class="fav-thumb w-full aspect-2-3 overflow-hidden bg-surface-2 relative">
               {#if e.logo}
                 {#if e.kind === "live"}
+                  <img
+                    src={e.logo}
+                    alt=""
+                    aria-hidden="true"
+                    loading="lazy"
+                    decoding="async"
+                    referrerpolicy="no-referrer"
+                    class="absolute inset-0 h-full w-full object-cover scale-110 saturate-150 brightness-75 opacity-60 blur-2xl pointer-events-none" />
                   <div class="absolute inset-0 flex items-center justify-center p-3">
                     <img
                       src={e.logo}
@@ -154,7 +162,7 @@
                       loading="lazy"
                       decoding="async"
                       referrerpolicy="no-referrer"
-                      class="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-[1.03]" />
+                      class="relative max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-[1.03]" />
                   </div>
                 {:else}
                   <img

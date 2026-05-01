@@ -156,11 +156,41 @@ function renderSeasonTabs(seasonKeys) {
     btn.textContent = `Season ${key}`
     btn.addEventListener("click", () => {
       if (currentSeason === key) return
+      const oldKey = currentSeason
+      const direction = (Number(key) || 0) > (Number(oldKey) || 0) ? 1 : -1
       currentSeason = key
       renderSeasonTabs(seasonKeys)
-      renderEpisodes()
+      slotMachineEpisodes(direction)
     })
     seasonTabs.appendChild(btn)
+  }
+}
+
+function slotMachineEpisodes(direction) {
+  if (!episodeList) return
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+  if (reduceMotion) {
+    renderEpisodes()
+    return
+  }
+  const dy = direction >= 0 ? -16 : 16
+  const dyIn = direction >= 0 ? 16 : -16
+  const easing = "cubic-bezier(0.16, 1, 0.3, 1)"
+  episodeList.animate(
+    [
+      { opacity: 1, transform: "translateY(0)" },
+      { opacity: 0, transform: `translateY(${dy}px)` },
+    ],
+    { duration: 180, easing, fill: "forwards" }
+  ).onfinish = () => {
+    renderEpisodes()
+    episodeList.animate(
+      [
+        { opacity: 0, transform: `translateY(${dyIn}px)` },
+        { opacity: 1, transform: "translateY(0)" },
+      ],
+      { duration: 280, easing, fill: "forwards" }
+    )
   }
 }
 

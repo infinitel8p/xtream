@@ -746,6 +746,23 @@ dialog[open]::backdrop {
     100% { opacity: 0;    transform: scale(1.18); }
 }
 
+.dt-hero {
+    position: relative;
+    isolation: isolate;
+}
+.dt-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 1;
+    background:
+        linear-gradient(90deg, color-mix(in oklch, var(--color-accent) 35%, transparent) 0, transparent 5%),
+        linear-gradient(270deg, color-mix(in oklch, oklch(0.78 0.17 230) 25%, transparent) 0, transparent 5%);
+    mix-blend-mode: screen;
+    opacity: 0.45;
+}
 .dt-hero img {
     transform-origin: center 40%;
 }
@@ -760,6 +777,11 @@ dialog[open]::backdrop {
 @keyframes dt-hero-kenburns {
     from { transform: scale(1); }
     to   { transform: scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .dt-hero::after {
+        opacity: 0.25;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1018,5 +1040,178 @@ dialog[open]::backdrop {
     .player-empty-glow {
         animation: none;
         opacity: 0.6;
+    }
+}
+
+.tuning-overlay {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: clamp(5rem, 18%, 10rem);
+    height: clamp(5rem, 18%, 10rem);
+    border-radius: 1.25rem;
+    background: var(--color-surface-2);
+    box-shadow:
+        0 0 0 1px color-mix(in oklch, var(--color-accent) 50%, transparent),
+        0 24px 48px -16px color-mix(in oklch, var(--color-accent) 60%, transparent),
+        0 8px 24px -8px rgb(0 0 0 / 0.5);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    z-index: 30;
+    pointer-events: none;
+    animation: tuning-overlay-pulse 880ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform, opacity;
+}
+.tuning-overlay img {
+    width: 76%;
+    height: 76%;
+    object-fit: contain;
+}
+.tuning-overlay--leaving {
+    animation: tuning-overlay-leave 360ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+@keyframes tuning-overlay-pulse {
+    0%   { transform: scale(0.92); opacity: 0; }
+    18%  { transform: scale(1.04); opacity: 1; }
+    60%  { transform: scale(1);    opacity: 1; }
+    100% { transform: scale(1);    opacity: 1; }
+}
+@keyframes tuning-overlay-leave {
+    to { transform: scale(1.12); opacity: 0; }
+}
+
+.scan-line-sweep::before,
+.scan-line-sweep::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 20;
+}
+.scan-line-sweep::before {
+    background: linear-gradient(
+        180deg,
+        transparent 0%,
+        color-mix(in oklch, var(--color-accent) 70%, transparent) 49%,
+        color-mix(in oklch, var(--color-accent) 90%, transparent) 50%,
+        color-mix(in oklch, var(--color-accent) 70%, transparent) 51%,
+        transparent 100%
+    );
+    transform: translateY(-100%);
+    animation: scan-line-sweep 620ms cubic-bezier(0.45, 0, 0.55, 1) forwards;
+    mix-blend-mode: screen;
+    opacity: 0.55;
+}
+.scan-line-sweep::after {
+    background:
+        repeating-linear-gradient(
+            0deg,
+            transparent 0,
+            transparent 2px,
+            rgba(255, 255, 255, 0.04) 2px,
+            rgba(255, 255, 255, 0.04) 3px
+        );
+    opacity: 0;
+    animation: scan-line-flicker 620ms ease-out forwards;
+    mix-blend-mode: overlay;
+}
+@keyframes scan-line-sweep {
+    from { transform: translateY(-100%); }
+    to   { transform: translateY(110%); }
+}
+@keyframes scan-line-flicker {
+    0%   { opacity: 0; }
+    10%  { opacity: 0.9; }
+    100% { opacity: 0; }
+}
+
+::view-transition-old(tuning-logo),
+::view-transition-new(tuning-logo) {
+    animation-duration: 520ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+::view-transition-group(tuning-logo) {
+    z-index: 50;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tuning-overlay,
+    .tuning-overlay--leaving {
+        animation: none;
+        opacity: 0;
+    }
+    .scan-line-sweep::before,
+    .scan-line-sweep::after {
+        animation: none;
+        display: none;
+    }
+}
+
+.xt-focus-glide {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+    z-index: 60;
+    box-shadow:
+        0 0 0 2px var(--color-accent),
+        0 0 0 6px color-mix(in oklch, var(--color-accent) 22%, transparent),
+        0 16px 36px -18px color-mix(in oklch, var(--color-accent) 70%, transparent);
+    border-radius: 12px;
+    opacity: 0;
+    transition: opacity 160ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform, width, height, opacity;
+}
+.xt-focus-glide[data-visible="false"] {
+    opacity: 0;
+}
+:is(a, button, input, textarea, select, summary, [tabindex]):focus-visible:has(~ .xt-focus-glide) {
+    /* Native outline stays - just kept here as a marker so future devs see
+       the relationship. */
+}
+@media (prefers-reduced-motion: reduce) {
+    .xt-focus-glide {
+        transition: none;
+    }
+}
+
+.tile-art {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 75%);
+    mask-image: linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0) 75%);
+}
+.tile-art__layer {
+    position: absolute;
+    top: -12%;
+    width: 124%;
+    height: 124%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+    filter: blur(10px) saturate(0.5) brightness(0.6);
+    opacity: 0;
+    transition: opacity 1400ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity;
+}
+.tile-art__layer[data-on="true"] {
+    opacity: 0.45;
+}
+.tile-art__layer--logo {
+    filter: blur(90px) saturate(1.3) brightness(0.85);
+}
+.tile-art__layer--logo[data-on="true"] {
+    opacity: 0.55;
+}
+@media (prefers-reduced-motion: reduce) {
+    .tile-art__layer {
+        transition: none;
     }
 }
