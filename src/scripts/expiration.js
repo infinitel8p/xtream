@@ -1,13 +1,5 @@
-import {
-    loadCreds,
-    getActiveEntry,
-    buildApiUrl,
-    safeHttpUrl,
-} from "./lib/creds.js"
-import { cachedFetch } from "./lib/cache.js"
-import { providerFetch } from "./lib/provider-fetch.js"
-
-const USER_INFO_TTL_MS = 60 * 60 * 1000 // 1 hour
+import { loadCreds, getActiveEntry } from "./lib/creds.js"
+import { ensureUserInfo, getExpirationMsSync } from "./lib/account-info.js"
 
 const BANNER_THRESHOLD_DAYS = 7
 
@@ -18,9 +10,6 @@ function fmtDaysLeft(days) {
 }
 
 function renderTargets(targets, value, { empty = "", emptyRaw = "-", expDateMs = null } = {}) {
-    // "Expired" only when the timestamp has actually passed. The day-left
-    // count is rounded UP so a 12h-remaining account reads "Expires in 1 day"
-    // and stays in the warning band, not "Account expired".
     const msLeft = expDateMs == null ? null : expDateMs - Date.now()
     const isExpired = msLeft != null && msLeft <= 0
     const daysLeft = msLeft == null ? null : Math.max(0, Math.ceil(msLeft / 86_400_000))
@@ -63,43 +52,18 @@ export async function injectExpirationDate() {
         return
     }
 
-    const apiUrl = buildApiUrl(creds, "")
-    if (!safeHttpUrl(apiUrl)) {
+    await ensureUserInfo(creds, active._id)
+    const expDateMs = getExpirationMsSync(active._id)
+    if (expDateMs == null) {
         renderTargets(targets, null)
         return
     }
-
-    try {
-        const { data } = await cachedFetch(
-            active._id,
-            "user_info",
-            USER_INFO_TTL_MS,
-            async () => {
-                const response = await providerFetch(apiUrl)
-                if (!response.ok) {
-                    throw new Error(
-                        `HTTP ${response.status} ${response.statusText}`
-                    )
-                }
-                return response.json()
-            }
-        )
-        const ts = parseInt(data?.user_info?.exp_date ?? "", 10)
-        if (!Number.isFinite(ts)) {
-            renderTargets(targets, null)
-            return
-        }
-        const expDateMs = ts * 1000
-        const formatted = new Date(expDateMs).toLocaleDateString("en-US", {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-        })
-        renderTargets(targets, formatted, { expDateMs })
-    } catch (e) {
-        console.error("Could not get Xtream account info:", e)
-        renderTargets(targets, null)
-    }
+    const formatted = new Date(expDateMs).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    })
+    renderTargets(targets, formatted, { expDateMs })
 }

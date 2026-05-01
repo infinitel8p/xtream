@@ -23,6 +23,7 @@ import { toast } from "@/scripts/lib/toast.js"
 import { ICON_X } from "@/scripts/lib/icons.js"
 import { providerFetch } from "@/scripts/lib/provider-fetch.js"
 import { renderProviderError } from "@/scripts/lib/provider-error.js"
+import { fmtImdbRating } from "@/scripts/lib/format.js"
 
 const VOD_TTL_MS = 24 * 60 * 60 * 1000
 
@@ -391,6 +392,22 @@ function makeCard(m, idx) {
     posterWrap.appendChild(img)
   } else {
     posterWrap.appendChild(makeFallback(m.name))
+  }
+
+  const ratingText = fmtImdbRating(m.rating)
+  if (ratingText) {
+    const ratingBadge = document.createElement("span")
+    ratingBadge.className =
+      "absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 " +
+      "rounded-md px-1.5 py-0.5 bg-black/55 backdrop-blur-sm " +
+      "ring-1 ring-white/10 text-white/90 text-2xs font-semibold tabular-nums"
+    ratingBadge.setAttribute("aria-label", `Rating ${ratingText} out of 10`)
+    ratingBadge.innerHTML =
+      '<svg viewBox="0 0 24 24" width="0.85em" height="0.85em" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true" class="text-accent">' +
+      '<path d="M12 17.75l-6.18 3.25 1.18-6.88L2 9.25l6.91-1L12 2l3.09 6.25 6.91 1-5 4.87 1.18 6.88z"/>' +
+      "</svg>" +
+      `<span>${ratingText}</span>`
+    posterWrap.appendChild(ratingBadge)
   }
 
   link.appendChild(posterWrap)

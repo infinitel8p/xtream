@@ -8,6 +8,7 @@ import {
   normalize,
 } from "@/scripts/lib/creds.js"
 import { providerFetch } from "@/scripts/lib/provider-fetch.js"
+import { ensureUserInfo } from "@/scripts/lib/account-info.js"
 
 const CHANNELS_TTL_MS = 24 * 60 * 60 * 1000
 const VOD_TTL_MS = 24 * 60 * 60 * 1000
@@ -346,6 +347,10 @@ export async function warmupActive(playlistId, opts = {}) {
       wrap("live", () => ensureLive(creds, pid, { force })),
       wrap("vod", () => ensureVod(creds, pid, { force })),
       wrap("series", () => ensureSeries(creds, pid, { force })),
+      // user_info comes alongside the catalog so download-concurrency caps
+      // and the expiration banner are populated without waiting for /settings.
+      // Failure is ignored - M3U sources won't have a player_api endpoint.
+      ensureUserInfo(creds, pid, { force }).catch(() => null),
     ])
     dispatch(EVT_WARMED, { playlistId: pid, errors })
     return { live, vod, series, errors }

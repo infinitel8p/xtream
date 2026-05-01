@@ -30,3 +30,10 @@ export function fmtBytes(n) {
   if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`
 }
+
+export function fmtImdbRating(raw) {
+  if (raw == null || raw === "") return ""
+  const value = parseFloat(String(raw).trim())
+  if (!Number.isFinite(value) || value <= 0) return ""
+  return value > 10 ? "10.0" : value.toFixed(1)
+}

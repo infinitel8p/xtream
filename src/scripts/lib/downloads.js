@@ -4,6 +4,10 @@ import {
   setDownloadDir,
   getDownloadConcurrency,
 } from "@/scripts/lib/app-settings.js"
+import {
+  getMaxConnectionsSync,
+  getActivePlaylistIdSync,
+} from "@/scripts/lib/account-info.js"
 import * as AFs from "@/scripts/lib/android-fs.js"
 
 const isTauri =
@@ -18,7 +22,10 @@ const STALL_WINDOW_MS = 30_000
 const STALL_CHECK_MS = 5_000
 
 function maxConcurrent() {
-  return getDownloadConcurrency()
+  const user = getDownloadConcurrency()
+  const cap = getMaxConnectionsSync(getActivePlaylistIdSync())
+  if (cap > 0 && cap < user) return cap
+  return user
 }
 
 /** @type {string[]} ids waiting for an active slot */

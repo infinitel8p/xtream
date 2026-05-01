@@ -39,6 +39,7 @@ import {
   chooseMime,
 } from "@/scripts/lib/morph-detail.js"
 import { attachPlayerFocusKeeper } from "@/scripts/lib/player-focus-keeper.js"
+import { fmtImdbRating } from "@/scripts/lib/format.js"
 
 const SERIES_INFO_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -434,11 +435,28 @@ function applySeriesInfo(data) {
 
   if (metaEl) {
     const bits = []
-    if (year) bits.push(String(year))
-    if (genre) bits.push(genre)
-    if (rating) bits.push(`Rating: ${String(rating).slice(0, 4)}`)
-    if (seasons.length) bits.push(`${seasons.length} season${seasons.length > 1 ? "s" : ""}`)
-    metaEl.textContent = bits.join(" • ")
+    if (year) bits.push(`<span>${escapeRatingText(String(year))}</span>`)
+    if (genre) bits.push(`<span>${escapeRatingText(genre)}</span>`)
+    const ratingText = fmtImdbRating(rating)
+    if (ratingText) {
+      bits.push(
+        '<span class="inline-flex items-center gap-1 text-fg-2" aria-label="IMDB rating ' +
+          ratingText +
+          ' out of 10">' +
+          '<svg viewBox="0 0 24 24" width="0.95em" height="0.95em" fill="currentColor" aria-hidden="true" class="text-accent">' +
+          '<path d="M12 17.75l-6.18 3.25 1.18-6.88L2 9.25l6.91-1L12 2l3.09 6.25 6.91 1-5 4.87 1.18 6.88z"/>' +
+          "</svg>" +
+          `<span class="font-medium tabular-nums">${ratingText}</span>` +
+          '<span class="text-fg-3">/10</span>' +
+          "</span>"
+      )
+    }
+    if (seasons.length) {
+      bits.push(
+        `<span>${seasons.length} season${seasons.length > 1 ? "s" : ""}</span>`
+      )
+    }
+    metaEl.innerHTML = bits.join(' <span aria-hidden="true">·</span> ')
   }
   if (plotEl) {
     plotEl.textContent = plot || (cast ? `Cast: ${cast}` : "No description available.")
@@ -490,6 +508,12 @@ function applySeriesInfo(data) {
 
   renderSeasonTabs(seasonKeys)
   renderEpisodes()
+}
+
+function escapeRatingText(text) {
+  const div = document.createElement("div")
+  div.textContent = String(text)
+  return div.innerHTML
 }
 
 // ----------------------------

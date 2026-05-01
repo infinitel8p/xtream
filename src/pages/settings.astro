@@ -292,6 +292,10 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
               <button type="button" data-concurrency="3" aria-pressed="false" class="dl-concurrency-btn btn">3</button>
               <button type="button" data-concurrency="4" aria-pressed="false" class="dl-concurrency-btn btn">4</button>
             </div>
+            <p
+              id="settings-download-concurrency-cap"
+              class="text-2xs text-fg-3 tabular-nums empty:hidden"
+              aria-live="polite"></p>
           </div>
         </article>
 
@@ -530,6 +534,7 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
       getEntries,
       refreshActive,
       isTauri,
+      loadCreds,
     } from "@/scripts/lib/creds.js"
     import {
       getNewestCacheTimeAsync,
@@ -552,6 +557,12 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
       getDownloadConcurrency,
       setDownloadConcurrency,
     } from "@/scripts/lib/app-settings.js"
+    import {
+      ensureUserInfo,
+      getMaxConnectionsSync,
+      getActiveConnectionsSync,
+      USER_INFO_LOADED_EVENT,
+    } from "@/scripts/lib/account-info.js"
     import { isDownloadable } from "@/scripts/lib/downloads.js"
     import { toastSuccess, toastError } from "@/scripts/lib/toast.js"
     import {
@@ -1340,12 +1351,50 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
     const concurrencyGroup = document.getElementById(
       "settings-download-concurrency"
     )
+    const concurrencyCapEl = document.getElementById(
+      "settings-download-concurrency-cap"
+    )
+
+    function readProviderCap() {
+      // 0 means "unknown" (M3U source or cache cold). UI falls back to the
+      // previous behaviour: all four buttons enabled, no cap message.
+      const active = JSON.parse(
+        localStorage.getItem("xt_playlists") || '{"selectedId":""}'
+      )
+      return getMaxConnectionsSync(active?.selectedId || "")
+    }
+    function readActiveCons() {
+      const active = JSON.parse(
+        localStorage.getItem("xt_playlists") || '{"selectedId":""}'
+      )
+      return getActiveConnectionsSync(active?.selectedId || "")
+    }
+
     function syncConcurrencyButtons() {
       if (!concurrencyGroup) return
       const current = getDownloadConcurrency()
+      const cap = readProviderCap()
       for (const btn of concurrencyGroup.querySelectorAll(".dl-concurrency-btn")) {
         const v = parseInt(btn.getAttribute("data-concurrency") || "1", 10)
         btn.setAttribute("aria-pressed", v === current ? "true" : "false")
+        const exceedsCap = cap > 0 && v > cap
+        btn.disabled = exceedsCap
+        btn.classList.toggle("opacity-50", exceedsCap)
+        btn.classList.toggle("cursor-not-allowed", exceedsCap)
+        btn.title = exceedsCap
+          ? `Your provider only allows ${cap} connection${cap === 1 ? "" : "s"}.`
+          : ""
+      }
+      if (concurrencyCapEl) {
+        if (cap <= 0) {
+          concurrencyCapEl.textContent = ""
+        } else {
+          const activeCons = readActiveCons()
+          const slots = `${cap} connection${cap === 1 ? "" : "s"}`
+          concurrencyCapEl.textContent = activeCons > 0
+            ? `Provider allows ${slots} (${activeCons} in use).`
+            : `Provider allows ${slots}.`
+        }
       }
     }
     syncConcurrencyButtons()
@@ -1353,11 +1402,31 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
       const btn = /** @type {HTMLElement} */ (e.target).closest(
         ".dl-concurrency-btn"
       )
-      if (!btn) return
+      if (!btn || btn.disabled) return
       const v = parseInt(btn.getAttribute("data-concurrency") || "1", 10)
       setDownloadConcurrency(v)
       syncConcurrencyButtons()
     })
+
+    // Refresh user_info on every active-playlist change and on Settings load
+    // so the cap reflects the current provider, not whatever was warmed last.
+    async function refreshUserInfoForActive() {
+      try {
+        const active = await getActiveEntry()
+        if (!active) {
+          syncConcurrencyButtons()
+          return
+        }
+        const creds = await loadCreds()
+        await ensureUserInfo(creds, active._id)
+        syncConcurrencyButtons()
+      } catch {
+        syncConcurrencyButtons()
+      }
+    }
+    refreshUserInfoForActive()
+    document.addEventListener(USER_INFO_LOADED_EVENT, syncConcurrencyButtons)
+    document.addEventListener("xt:active-changed", refreshUserInfoForActive)
 
     const updateSectionEl = document.getElementById("update-section")
     const updatePillEl = document.getElementById("update-pill")

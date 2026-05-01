@@ -2,6 +2,7 @@
 import Layout from "@/layouts/Layout.astro";
 import ContinueWatching from "@/components/ContinueWatching.svelte";
 import FavoritesStrip from "@/components/FavoritesStrip.svelte";
+import RecentlyAddedStrip from "@/components/RecentlyAddedStrip.svelte";
 import {
 	IconDeviceTv,
 	IconMovie,
@@ -200,6 +201,7 @@ import {
 
 		<ContinueWatching client:load />
 		<FavoritesStrip client:load />
+		<RecentlyAddedStrip client:load />
 	</main>
 </Layout>
 
