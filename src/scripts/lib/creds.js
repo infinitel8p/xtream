@@ -511,3 +511,27 @@ export const debounce = (fn, ms = 180) => {
     t = setTimeout(() => fn(...args), ms)
   }
 }
+
+/**
+ * Score a normalized string against query tokens. Returns 0 when any token
+ * fails to match. Higher score = better match. Mirrors the scoring used by
+ * `SearchView.svelte` so per-page search results rank consistently with
+ * the global Cmd+K search.
+ *
+ * Per token: `100 - matchPosition` (capped) + `25` if `norm` starts with the
+ * token. Summed across tokens.
+ *
+ * @param {string} norm Already normalized via `normalize()`.
+ * @param {string[]} tokens Already normalized + split.
+ * @returns {number}
+ */
+export function scoreNormMatch(norm, tokens) {
+  if (!norm || !tokens || !tokens.length) return 0
+  let score = 0
+  for (const token of tokens) {
+    const idx = norm.indexOf(token)
+    if (idx === -1) return 0
+    score += 100 - (idx > 99 ? 99 : idx) + (norm.startsWith(token) ? 25 : 0)
+  }
+  return score
+}

@@ -8,6 +8,7 @@ import {
   isLikelyM3USource,
   normalize,
   debounce,
+  scoreNormMatch,
 } from "@/scripts/lib/creds.js"
 import { cachedFetch, getCached, hydrate as hydrateCache } from "@/scripts/lib/cache.js"
 import {
@@ -573,6 +574,19 @@ function focusByIdx(idx) {
   if (present) present.focus({ preventScroll: true })
 }
 
+/** Scroll the virtualized list so row `idx` is in view, without grabbing focus. */
+function scrollIntoViewByIdx(idx) {
+  if (!listEl || idx < 0 || idx >= filtered.length) return
+  const top = idx * ROW_H
+  const visTop = listEl.scrollTop
+  const visBottom = visTop + listEl.clientHeight
+  if (top < visTop) {
+    listEl.scrollTop = Math.max(0, top - ROW_H * 2)
+  } else if (top + ROW_H > visBottom) {
+    listEl.scrollTop = top + ROW_H - listEl.clientHeight + ROW_H * 2
+  }
+}
+
 listEl?.addEventListener(
   "keydown",
   (e) => {
@@ -604,6 +618,145 @@ listEl?.addEventListener(
   },
   true
 )
+
+let digitBuffer = ""
+let digitTimer = null
+let digitOverlayEl = null
+
+function showDigitOverlay(text) {
+  if (!digitOverlayEl) {
+    digitOverlayEl = document.createElement("div")
+    digitOverlayEl.setAttribute("aria-live", "polite")
+    digitOverlayEl.setAttribute("role", "status")
+    digitOverlayEl.className =
+      "fixed top-6 left-1/2 -translate-x-1/2 z-50 " +
+      "px-5 py-2.5 rounded-2xl bg-surface ring-1 ring-line shadow-xl " +
+      "text-fg font-semibold text-3xl tabular-nums tracking-[0.04em] " +
+      "pointer-events-none select-none"
+    document.body.appendChild(digitOverlayEl)
+  }
+  digitOverlayEl.textContent = text
+}
+
+function hideDigitOverlay() {
+  if (digitOverlayEl) {
+    digitOverlayEl.remove()
+    digitOverlayEl = null
+  }
+}
+
+function commitDigitBuffer() {
+  if (digitTimer) {
+    clearTimeout(digitTimer)
+    digitTimer = null
+  }
+  const num = parseInt(digitBuffer, 10)
+  digitBuffer = ""
+  hideDigitOverlay()
+  if (!Number.isFinite(num) || num < 1) return
+  const idx = num - 1
+  if (idx >= filtered.length) return
+  const ch = filtered[idx]
+  if (!ch) return
+  focusByIdx(idx)
+  play(ch.id, ch.name)
+}
+
+function isTypingTarget(target) {
+  if (!target) return false
+  const el = /** @type {HTMLElement} */ (target)
+  if (el.isContentEditable) return true
+  const tag = el.tagName
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true
+  if (typeof el.closest === "function" && el.closest("dialog[open]")) return true
+  return false
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey) return
+  if (isTypingTarget(e.target)) return
+
+  if (/^\d$/.test(e.key)) {
+    digitBuffer = (digitBuffer + e.key).slice(0, 4)
+    showDigitOverlay(digitBuffer)
+    if (digitTimer) clearTimeout(digitTimer)
+    digitTimer = setTimeout(commitDigitBuffer, 1100)
+    e.preventDefault()
+    return
+  }
+
+  if (digitBuffer && e.key === "Enter") {
+    e.preventDefault()
+    commitDigitBuffer()
+    return
+  }
+
+  if (digitBuffer && e.key === "Escape") {
+    if (digitTimer) clearTimeout(digitTimer)
+    digitTimer = null
+    digitBuffer = ""
+    hideDigitOverlay()
+    e.preventDefault()
+    return
+  }
+
+  if (e.key === "[" || e.key === "]") {
+    if (!filtered.length) return
+    const currentIdx = currentlyPlayingId != null
+      ? filtered.findIndex((channel) => channel.id === currentlyPlayingId)
+      : -1
+    let nextIdx
+    if (currentIdx === -1) {
+      nextIdx = e.key === "]" ? 0 : filtered.length - 1
+    } else {
+      nextIdx = e.key === "[" ? currentIdx - 1 : currentIdx + 1
+      if (nextIdx < 0) nextIdx = filtered.length - 1
+      if (nextIdx >= filtered.length) nextIdx = 0
+    }
+    const channel = filtered[nextIdx]
+    if (!channel) return
+    e.preventDefault()
+    focusByIdx(nextIdx)
+    play(channel.id, channel.name)
+    return
+  }
+
+  // Player shortcuts
+  if (!vjs) return
+  const lower = e.key.length === 1 ? e.key.toLowerCase() : e.key
+  switch (lower) {
+    case " ":
+    case "spacebar": {
+      e.preventDefault()
+      if (vjs.paused()) vjs.play()?.catch(() => {})
+      else vjs.pause()
+      return
+    }
+    case "m": {
+      e.preventDefault()
+      vjs.muted(!vjs.muted())
+      return
+    }
+    case "f": {
+      e.preventDefault()
+      if (vjs.isFullscreen()) vjs.exitFullscreen()
+      else vjs.requestFullscreen()
+      return
+    }
+    case "j":
+    case "l": {
+      e.preventDefault()
+      const delta = lower === "j" ? -10 : 10
+      const dur = vjs.duration()
+      const next = (vjs.currentTime() || 0) + delta
+      const clamped = Number.isFinite(dur) && dur > 0
+        ? Math.max(0, Math.min(dur, next))
+        : Math.max(0, next)
+      try { vjs.currentTime(clamped) } catch {}
+      return
+    }
+  }
+})
 
 let _applyFilterScheduled = false
 function scheduleApplyFilter() {
@@ -652,7 +805,13 @@ const applyFilter = () => {
   }
 
   if (tokens.length) {
-    out = out.filter((ch) => tokens.every((t) => ch.norm.includes(t)))
+    const scored = []
+    for (const channel of out) {
+      const score = scoreNormMatch(channel.norm, tokens)
+      if (score > 0) scored.push({ channel, score })
+    }
+    scored.sort((first, second) => second.score - first.score)
+    out = scored.map((row) => row.channel)
   }
 
   listStatus.textContent = `${out.length.toLocaleString()} of ${all.length.toLocaleString()} channels`
@@ -1069,7 +1228,18 @@ function maybeAutoplayFromUrl() {
     url.searchParams.delete("channel")
     window.history.replaceState({}, "", url.toString())
   } catch {}
+
+  if (!filtered.some((channel) => channel.id === id)) {
+    activeCat = ""
+    try { localStorage.setItem("xt_active_cat", "") } catch {}
+    if (searchEl && searchEl.value) searchEl.value = ""
+    applyFilter()
+  }
   play(ch.id, ch.name)
+  requestAnimationFrame(() => {
+    const idx = filtered.findIndex((channel) => channel.id === id)
+    if (idx >= 0) scrollIntoViewByIdx(idx)
+  })
 }
 
 async function loadChannels() {

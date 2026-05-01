@@ -6,6 +6,7 @@ import {
   buildApiUrl,
   normalize,
   debounce,
+  scoreNormMatch,
 } from "@/scripts/lib/creds.js"
 import { cachedFetch, getCached, hydrate as hydrateCache } from "@/scripts/lib/cache.js"
 import {
@@ -679,14 +680,31 @@ function applyFilter() {
     })
   }
 
+  /** @type {Map<number, number> | null} */
+  let scoreById = null
   if (tokens.length) {
-    out = out.filter((m) => tokens.every((t) => m.norm.includes(t)))
+    scoreById = new Map()
+    const scored = []
+    for (const movie of out) {
+      const score = scoreNormMatch(movie.norm, tokens)
+      if (score > 0) {
+        scored.push(movie)
+        scoreById.set(movie.id, score)
+      }
+    }
+    out = scored
   }
 
   const mode = activePlaylistId
     ? getViewSort(activePlaylistId, "vod")
     : "default"
-  if (mode === "added") {
+  if (mode === "default" && scoreById) {
+    out = out
+      .slice()
+      .sort((firstMovie, secondMovie) =>
+        (scoreById.get(secondMovie.id) || 0) - (scoreById.get(firstMovie.id) || 0)
+      )
+  } else if (mode === "added") {
     out = out
       .slice()
       .sort((a, b) => Number(b.added || 0) - Number(a.added || 0))
