@@ -46,6 +46,8 @@ jobs:
       models: read
     outputs:
       release_id: ${{ steps.create.outputs.result }}
+      tag: ${{ steps.meta.outputs.tag }}
+      updater_notes: ${{ steps.create.outputs.updater_notes }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,27 +77,63 @@ jobs:
         shell: bash
         env:
           PREV_TAG: ${{ steps.meta.outputs.prev_tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           if [ -n "$PREV_TAG" ]; then
             RANGE="${PREV_TAG}..HEAD"
             HEADER="Commits since ${PREV_TAG}"
+            PREV_DATE=$(git log -1 --format=%cI "$PREV_TAG" || echo "")
           else
             RANGE=""
             HEADER="All commits (no previous tag)"
+            PREV_DATE=""
           fi
+          # Order matters: with the 24 KB trim below, content earlier in this
+          # block is more likely to survive truncation. Order from highest to
+          # lowest signal:
+          #   1. Compact commit subjects (always fits, gives the model an index)
+          #   2. Merged PR descriptions (canonical "what shipped" for release
+          #      branches - usually the most valuable single source)
+          #   3. Commit details with bodies (richer fallback)
+          #   4. File change summary (noise; lowest priority)
           {
             echo "## $HEADER"
+            echo
+            echo "### Commit subjects"
             echo
             git log --no-merges --pretty=format:'- %s (%h) by %an' $RANGE
             echo
             echo
-            echo "## File change summary"
+            if [ -n "$PREV_DATE" ]; then
+              echo "### Merged PR descriptions"
+              echo
+              gh pr list \
+                --state merged \
+                --base main \
+                --limit 50 \
+                --search "merged:>$PREV_DATE" \
+                --json number,title,body,mergedAt \
+                --jq '.[] | "#### #\(.number): \(.title)\n\nMerged: \(.mergedAt)\n\n\(.body)\n\n---\n"' \
+                || echo "(no merged PRs found)"
+              echo
+            fi
+            echo "### Commit details (subject + body)"
+            echo
+            git log --no-merges --pretty=format:'#### %s (%h)%n%n%b%n---%n' $RANGE
+            echo
+            echo "### File change summary"
             echo
             git diff --stat $RANGE | tail -n 200
           } > "$RUNNER_TEMP/changes.md"
-          # Cap the payload so we never blow past the model's context window.
-          head -c 16000 "$RUNNER_TEMP/changes.md" > "$RUNNER_TEMP/changes.trimmed.md"
+          # GitHub Models on Copilot Pro caps gpt-4o at 8000 input tokens per
+          # request (rate-limit tier "Low"). With the system prompt eating
+          # ~800 tokens, we have ~7000 tokens for content - roughly 24 KB of
+          # ASCII text. Trim aggressively from the front of the file so the
+          # most important section (PR descriptions, when present) is most
+          # likely to fit; the gather step ordered them with PR descriptions
+          # first when available.
+          head -c 24000 "$RUNNER_TEMP/changes.md" > "$RUNNER_TEMP/changes.trimmed.md"
           {
             echo 'log<<CHANGES_EOF'
             cat "$RUNNER_TEMP/changes.trimmed.md"
@@ -106,12 +144,29 @@ jobs:
         continue-on-error: true
         uses: actions/ai-inference@v1
         with:
-          model: openai/gpt-4o-mini
-          max-tokens: 1200
+          # On Copilot Pro, gpt-4o is the strongest practical model for this
+          # task because it has the largest input window (8000 tokens). The
+          # newer reasoning-tier models (gpt-5, gpt-5-mini, o4-mini) are
+          # capped at 4000 input tokens which is too tight for the PR-body +
+          # commit-body payload below. Don't "upgrade" to gpt-5 without first
+          # cutting the input cap in half.
+          # See https://docs.github.com/en/github-models/use-github-models/prototyping-with-ai-models#rate-limits
+          model: openai/gpt-4o
+          max-tokens: 4000
           system-prompt: |
             You write user-facing release notes for "Extreme InfiniTV", an IPTV
-            player built with Astro + Svelte 5 and Tauri 2 (Windows desktop,
-            Microsoft Store, Android). Audience: end users, not contributors.
+            player built with Astro + Svelte 5 and Tauri 2. It ships on
+            Windows desktop (NSIS + Microsoft Store), Android phone / tablet /
+            TV (Google Play + APK), macOS, Linux, and the web. Audience: end
+            users, not contributors.
+
+            You are given three sources of truth, in priority order:
+              1. Merged PR descriptions - the most reliable "what shipped".
+                 When present, treat them as the primary source.
+              2. Commit details (subject + body) - bodies often list multiple
+                 user-visible features under one subject.
+              3. Commit subjects - the weakest source; use only for filling in
+                 minor changes the PR descriptions don't cover.
 
             Output structure (in this exact order):
 
@@ -120,9 +175,13 @@ jobs:
                It should answer "what's the most useful thing in this release
                for a user". No preamble like "In this release". Skip this line
                only if no commit is user-facing.
-            2. A blank line.
-            3. Section headings, each on its own line, in this exact order, omitting
-               any whose bullet list would be empty:
+            2. If the release contains a breaking change, rename, or anything
+               existing users need to know about *before* updating, add a
+               `## Heads up` section directly after the summary explaining what
+               changes for them. Skip this section if there is no breaking change.
+            3. A blank line.
+            4. Section headings, each on its own line, in this exact order,
+               omitting any whose bullet list would be empty:
                  ### New
                  ### Improved
                  ### Fixed
@@ -131,16 +190,28 @@ jobs:
 
             Rules:
             - Output GitHub-flavoured markdown only. No preamble before the
-              summary sentence, no closing remarks after the last bullet.
-            - One bullet per change. Rewrite each commit subject as a short
-              user-facing sentence. Drop conventional-commit prefixes
-              (feat:, fix:, chore:, refactor:, etc.).
-            - Merge duplicates. Collapse multiple dependency bumps into a single
-              "Updated dependencies" bullet under "Under the hood".
+              summary, no closing remarks after the last bullet.
+            - A single commit or PR can produce multiple bullets when it
+              touches multiple user-visible features. Don't compress unrelated
+              features into one bullet just because they share a commit.
+            - Be concrete and specific. Prefer "Picture-in-Picture and a
+              subtitle / audio-track picker in the movies and series player"
+              over "Improved player UI". Name the feature, not the abstraction.
+            - Drop conventional-commit prefixes (feat:, fix:, chore:, etc.)
+              when rewriting subjects into bullets.
+            - Sort bullets within each section by user impact, biggest first.
+            - Merge duplicates. Collapse multiple dependency bumps into a
+              single "Updated dependencies" bullet under "Under the hood",
+              but only include it when commits actually exist for it - never
+              invent a dependency-bump bullet to fill space.
             - Skip purely internal noise (lockfile-only changes, CI tweaks,
-              comment edits, tracking-file removals) unless they affect users.
-            - Do not invent features. If the commits do not justify a heading,
-              omit it.
+              comment edits, tracking-file removals, screenshot updates,
+              README rewrites that don't change behaviour) unless they affect
+              users.
+            - Do not invent features. If the sources do not justify a heading
+              or a bullet, omit it.
+            - Don't write meta-bullets like "Various improvements" or
+              "Several bug fixes". Be specific or omit.
             - No emojis anywhere - not in the summary, not in headings, not in
               bullets. Plain text only.
             - Never use em dashes. Use a regular hyphen, a colon, parentheses,
@@ -180,29 +251,46 @@ jobs:
             }
 
             let summary = ''
+            let updaterNotes = ''
             const lines = changelog.split('\n')
             const summaryMatch = lines[0]?.trim().match(/^\*\*(.+)\*\*\s*$/)
             if (summaryMatch) {
               summary = `<strong>${summaryMatch[1]}</strong>`
+              updaterNotes = summaryMatch[1].trim()
               let i = 1
               while (i < lines.length && lines[i].trim() === '') i++
               changelog = lines.slice(i).join('\n').trim()
             }
+            // Fall back to the tag if the AI step skipped or failed - the
+            // in-app updater dialog should never show an empty notes field.
+            if (!updaterNotes) {
+              updaterNotes = `${tag} - see the GitHub release for details.`
+            }
+            core.setOutput('updater_notes', updaterNotes)
 
+            // GitHub asset URLs replace spaces in the original filename with
+            // dots when serving the file. Wrap each row's filename in a
+            // markdown link so users can click through directly without
+            // scrolling to the Assets section at the bottom.
+            const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`
+            const fileLink = (filename) => {
+              const slug = filename.replace(/ /g, '.')
+              return `[\`${filename}\`](${repoUrl}/releases/download/${tag}/${slug})`
+            }
             const downloads = [
               '## Downloads',
               '',
-              'Pick the file that matches your device. The Microsoft Store and Google Play buttons below are the easiest path on Windows and Android.',
+              'Pick the file that matches your device. Click a filename to download it directly. The Microsoft Store and Google Play buttons below are the easiest path on Windows and Android.',
               '',
               '| Platform | File |',
               '|----------|------|',
-              `| Windows 10/11 (recommended installer) | \`Extreme InfiniTV_${version}_x64-setup.exe\` |`,
-              `| Windows (MSI alternative) | \`Extreme InfiniTV_${version}_x64_en-US.msi\` |`,
-              `| macOS (Apple Silicon + Intel) | \`Extreme InfiniTV_${version}_universal.dmg\` |`,
-              `| Linux Debian / Ubuntu / Mint | \`extreme-infinitv_${version}_amd64.deb\` |`,
-              `| Linux Fedora / openSUSE / RHEL | \`extreme-infinitv-${version}-1.x86_64.rpm\` |`,
-              `| Linux portable (any distro) | \`extreme-infinitv_${version}_amd64.AppImage\` |`,
-              `| Android sideload (APK) | \`Extreme InfiniTV_${version}.apk\` |`,
+              `| Windows 10/11 (recommended installer) | ${fileLink(`Extreme InfiniTV_${version}_x64-setup.exe`)} |`,
+              `| Windows (MSI alternative) | ${fileLink(`Extreme InfiniTV_${version}_x64_en-US.msi`)} |`,
+              `| macOS (Apple Silicon + Intel) | ${fileLink(`Extreme InfiniTV_${version}_universal.dmg`)} |`,
+              `| Linux Debian / Ubuntu / Mint | ${fileLink(`extreme-infinitv_${version}_amd64.deb`)} |`,
+              `| Linux Fedora / openSUSE / RHEL | ${fileLink(`extreme-infinitv-${version}-1.x86_64.rpm`)} |`,
+              `| Linux portable (any distro) | ${fileLink(`extreme-infinitv_${version}_amd64.AppImage`)} |`,
+              `| Android sideload (APK) | ${fileLink(`Extreme InfiniTV_${version}.apk`)} |`,
               '',
               '<details><summary>What about the <code>.sig</code> files, <code>latest.json</code> and the macOS <code>.app.tar.gz</code>?</summary>',
               '',
@@ -412,6 +500,38 @@ jobs:
             "${{ steps.collect.outputs.out }}/"*.aab \
             "${{ steps.collect.outputs.out }}/"*.apk \
             --clobber
+
+  # Patch the in-app auto-updater dialog text in `latest.json`. tauri-action
+  # generates this file with `notes: ""` by default, so the in-app updater
+  # prompt would otherwise show an empty changelog. We download the file the
+  # build job uploaded, set `notes` to the AI-generated summary line, and
+  # re-upload it with --clobber.
+  patch-updater-notes:
+    needs: [create-release, build-tauri]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Patch latest.json notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: ${{ needs.create-release.outputs.updater_notes }}
+          TAG: ${{ needs.create-release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p _updater
+          cd _updater
+          if ! gh release download "$TAG" -p latest.json --repo "${{ github.repository }}"; then
+            echo "::warning::latest.json missing on release $TAG - skipping notes patch"
+            exit 0
+          fi
+          node -e "
+            const fs = require('fs');
+            const j = JSON.parse(fs.readFileSync('latest.json', 'utf8'));
+            j.notes = process.env.NOTES;
+            fs.writeFileSync('latest.json', JSON.stringify(j, null, 2));
+          "
+          gh release upload "$TAG" latest.json --clobber --repo "${{ github.repository }}"
 
   # publish-release:
   #   needs: [create-release, build-tauri, build-android]
