@@ -9,7 +9,7 @@ import {
 } from "@/scripts/lib/creds.js"
 import { normalize } from "@/scripts/lib/text.js"
 import { debounce } from "@/scripts/lib/debounce.js"
-import { t } from "@/scripts/lib/i18n.js"
+import { t, initI18n } from "@/scripts/lib/i18n.js"
 import { getCached } from "@/scripts/lib/cache.js"
 import { providerFetch } from "@/scripts/lib/provider-fetch.js"
 import { renderProviderError } from "@/scripts/lib/provider-error.js"
@@ -682,6 +682,9 @@ function filterCategories() {
 categorySearchEl?.addEventListener("input", debounce(filterCategories, 120))
 
 async function init() {
+  // Wait for the locale JSON to resolve before any t() call so the page
+  // never flashes an English string that gets replaced 100ms later.
+  await initI18n()
   showLoadingSkeleton(t("epg.loadingSkeleton"))
 
   creds = await loadCreds()

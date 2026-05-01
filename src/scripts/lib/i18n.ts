@@ -174,10 +174,20 @@ export function applyI18nDOM(root: ParentNode = document): void {
   }
 }
 
-/** Initialise i18n at app boot. Called once from `Layout.astro`. */
-export async function initI18n(): Promise<void> {
-  const code = detectLocale()
-  await setLocale(code === "en" ? "en" : code)
+let _initPromise: Promise<void> | null = null
+
+/**
+ * Initialise i18n at app boot. Idempotent: callers across modules share a
+ * single in-flight promise. Page modules that read translations
+ * synchronously should `await initI18n()` first to avoid an English flash
+ * before the locale JSON resolves.
+ */
+export function initI18n(): Promise<void> {
+  if (!_initPromise) {
+    const code = detectLocale()
+    _initPromise = setLocale(code === "en" ? "en" : code)
+  }
+  return _initPromise
 }
 
 export const LOCALE_EVENT = LOCALE_CHANGED_EVENT
