@@ -64,36 +64,39 @@
       title: entry.title || "Untitled playlist",
     }))
 
-    // Hydrate every playlist's catalogs in parallel so logo / name lookups
-    // resolve for items that have no favMeta on record yet (older saves).
+    const raw = getAllGlobalFavorites()
+    const needed = new Map()
+    for (const row of raw) {
+      const kinds = needed.get(row.playlistId) || new Set()
+      kinds.add(row.kind)
+      if (row.kind === "live") kinds.add("m3u")
+      needed.set(row.playlistId, kinds)
+    }
     await Promise.all(
-      allEntries.flatMap((entry) => [
-        hydrateCache(entry._id, "live"),
-        hydrateCache(entry._id, "m3u"),
-        hydrateCache(entry._id, "vod"),
-        hydrateCache(entry._id, "series"),
-      ])
+      [...needed].flatMap(([playlistId, kinds]) =>
+        [...kinds].map((kind) => hydrateCache(playlistId, kind))
+      )
     )
 
     /** @type {Map<string, { live: Map<number, any>, vod: Map<number, any>, series: Map<number, any> }>} */
     const lookups = new Map()
-    for (const entry of allEntries) {
-      lookups.set(entry._id, {
+    for (const playlistId of needed.keys()) {
+      lookups.set(playlistId, {
         live: new Map(
           (
-            getCached(entry._id, "live")?.data ||
-            getCached(entry._id, "m3u")?.data ||
+            getCached(playlistId, "live")?.data ||
+            getCached(playlistId, "m3u")?.data ||
             []
           ).map((item) => [Number(item.id), item])
         ),
         vod: new Map(
-          (getCached(entry._id, "vod")?.data || []).map((item) => [
+          (getCached(playlistId, "vod")?.data || []).map((item) => [
             Number(item.id),
             item,
           ])
         ),
         series: new Map(
-          (getCached(entry._id, "series")?.data || []).map((item) => [
+          (getCached(playlistId, "series")?.data || []).map((item) => [
             Number(item.id),
             item,
           ])
@@ -102,7 +105,6 @@
     }
 
     const titleById = new Map(playlists.map((entry) => [entry.id, entry.title]))
-    const raw = getAllGlobalFavorites()
     entries = raw.map((row) => {
       const meta = getFavoriteMeta(row.playlistId, row.kind, row.id)
       const item = lookups.get(row.playlistId)?.[row.kind]?.get(Number(row.id))
@@ -199,7 +201,7 @@
     </div>
   {:else if !visible.length}
     <div class="rounded-2xl border border-line bg-surface px-5 py-8 text-sm text-fg-2">
-      {tr("favorites.helperEmpty")}
+      {tr("favorites.helperFiltered")}
     </div>
   {:else}
     <div class="px-1 text-xs text-fg-3 tabular-nums">
@@ -292,5 +294,13 @@
     background: var(--color-surface-2);
     border-color: var(--color-accent);
     color: var(--color-fg);
+  }
+  /* Touch / TV-remote: bump chip to 44px tap target. */
+  @media (pointer: coarse) {
+    .filter-chip {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+      min-height: 2.75rem;
+    }
   }
 </style>

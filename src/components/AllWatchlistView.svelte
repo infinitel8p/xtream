@@ -63,27 +63,31 @@
       title: entry.title || "Untitled playlist",
     }))
 
-    // Hydrate every playlist's catalogs in parallel so name / poster lookups
-    // resolve for items that have no stored meta yet.
+    const raw = getAllGlobalWatchlist()
+    const needed = new Map()
+    for (const row of raw) {
+      const kinds = needed.get(row.playlistId) || new Set()
+      kinds.add(row.kind)
+      needed.set(row.playlistId, kinds)
+    }
     await Promise.all(
-      allEntries.flatMap((entry) => [
-        hydrateCache(entry._id, "vod"),
-        hydrateCache(entry._id, "series"),
-      ])
+      [...needed].flatMap(([playlistId, kinds]) =>
+        [...kinds].map((kind) => hydrateCache(playlistId, kind))
+      )
     )
 
     /** @type {Map<string, { vod: Map<number, any>, series: Map<number, any> }>} */
     const lookups = new Map()
-    for (const entry of allEntries) {
-      lookups.set(entry._id, {
+    for (const playlistId of needed.keys()) {
+      lookups.set(playlistId, {
         vod: new Map(
-          (getCached(entry._id, "vod")?.data || []).map((item) => [
+          (getCached(playlistId, "vod")?.data || []).map((item) => [
             Number(item.id),
             item,
           ])
         ),
         series: new Map(
-          (getCached(entry._id, "series")?.data || []).map((item) => [
+          (getCached(playlistId, "series")?.data || []).map((item) => [
             Number(item.id),
             item,
           ])
@@ -92,7 +96,6 @@
     }
 
     const titleById = new Map(playlists.map((entry) => [entry.id, entry.title]))
-    const raw = getAllGlobalWatchlist()
     entries = raw.map((row) => {
       const item = lookups.get(row.playlistId)?.[row.kind]?.get(Number(row.id))
       const name = row.name || item?.name || `${kindLabel(row.kind)} ${row.id}`
@@ -186,7 +189,7 @@
     </div>
   {:else if !visible.length}
     <div class="rounded-2xl border border-line bg-surface px-5 py-8 text-sm text-fg-2">
-      {tr("watchlist.helperEmpty")}
+      {tr("watchlist.helperFiltered")}
     </div>
   {:else}
     <div class="px-1 text-xs text-fg-3 tabular-nums">
@@ -259,5 +262,13 @@
     background: var(--color-surface-2);
     border-color: var(--color-accent);
     color: var(--color-fg);
+  }
+  /* Touch / TV-remote: bump chip to 44px tap target. */
+  @media (pointer: coarse) {
+    .filter-chip {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+      min-height: 2.75rem;
+    }
   }
 </style>

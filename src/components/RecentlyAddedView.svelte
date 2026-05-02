@@ -148,8 +148,7 @@
     </div>
   {:else}
     <div class="px-1 text-xs text-fg-3 tabular-nums">
-      Showing <strong class="text-fg-2">{visible.length}</strong> of
-      <strong class="text-fg-2">{counts[filter]}</strong>
+      {tr("recentlyAdded.showingOfTotal", { visible: visible.length, total: counts[filter] })}
     </div>
   {/if}
 </div>
@@ -223,13 +222,8 @@
 
     {#if visible.length < (filter === "all" ? merged.length : counts[filter])}
       <div class="col-span-full flex justify-center py-3">
-        <button
-          type="button"
-          onclick={loadMore}
-          class="rounded-xl border border-line bg-surface px-4 py-2 text-sm
-                 hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:border-accent
-                 transition-colors">
-          Load more
+        <button type="button" onclick={loadMore} class="btn">
+          {tr("recentlyAdded.loadMore")}
         </button>
       </div>
     {/if}
@@ -243,4 +237,12 @@
     color: var(--color-fg);
   }
   .aspect-2-3 { aspect-ratio: 2 / 3; }
+  /* Touch / TV-remote: bump chip to 44px tap target. */
+  @media (pointer: coarse) {
+    .filter-chip {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+      min-height: 2.75rem;
+    }
+  }
 </style>

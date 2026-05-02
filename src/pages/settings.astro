@@ -14,6 +14,8 @@ import {
   IconHeart,
   IconCoffee,
   IconBrandPaypal,
+  IconBug,
+  IconMail,
 } from "@tabler/icons-svelte"
 import HiddenCategoriesEditor from "@/components/HiddenCategoriesEditor.svelte"
 import LocalePicker from "@/components/LocalePicker.svelte"
@@ -516,6 +518,41 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
       </article>
 
       <span id="app-version" class="hidden"></span>
+    </section>
+
+    <!-- Group: Help & feedback -->
+    <section class="flex flex-col gap-3">
+      <h2 data-i18n="settings.group.help" class="text-xs font-semibold uppercase tracking-widest text-fg-2">Help & feedback</h2>
+      <article class="rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+        <div class="flex items-start gap-3">
+          <span class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">
+            <IconMail aria-hidden="true" stroke={2} class="size-4" />
+          </span>
+          <div class="flex flex-col gap-1 min-w-0">
+            <h3 data-i18n="settings.help.title" class="text-base font-semibold">Found a bug or have a suggestion?</h3>
+            <p data-i18n="settings.help.intro" class="text-sm text-fg-2">
+              Bug reports and feature requests go to GitHub - search existing issues first, or open a new one. For general feedback, email works too.
+            </p>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <a
+            href="https://github.com/infinitel8p/Extreme-InfiniTV/issues/new/choose"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-external
+            class="btn justify-start sm:justify-center">
+            <IconBug aria-hidden="true" class="btn-icon" />
+            <span data-i18n="settings.help.reportIssue">Report a bug</span>
+          </a>
+          <a
+            href="mailto:ludo@flexvelop.com?subject=Extreme%20InfiniTV%20feedback"
+            class="btn justify-start sm:justify-center">
+            <IconMail aria-hidden="true" class="btn-icon" />
+            <span data-i18n="settings.help.emailFeedback">Email feedback</span>
+          </a>
+        </div>
+      </article>
     </section>
 
     <!-- Group: Support / donations -->

@@ -179,19 +179,18 @@ export async function setLocale(input: string | null): Promise<void> {
  */
 export function applyI18nDOM(root: ParentNode = document): void {
   if (typeof document === "undefined") return
-  for (const el of root.querySelectorAll<HTMLElement>("[data-i18n]")) {
-    const key = el.dataset.i18n
-    if (key) el.textContent = t(key)
-  }
-  for (const el of root.querySelectorAll<HTMLElement>("[data-i18n-html]")) {
-    const key = el.dataset.i18nHtml
-    if (key) el.innerHTML = t(key)
-  }
-  for (const el of root.querySelectorAll<HTMLElement>("[data-i18n-attr]")) {
-    const spec = el.dataset.i18nAttr || ""
-    for (const pair of spec.split(";")) {
-      const [attr, key] = pair.split(":").map((part) => part.trim())
-      if (attr && key) el.setAttribute(attr, t(key))
+  const selector = "[data-i18n], [data-i18n-html], [data-i18n-attr]"
+  for (const el of root.querySelectorAll<HTMLElement>(selector)) {
+    const textKey = el.dataset.i18n
+    if (textKey) el.textContent = t(textKey)
+    const htmlKey = el.dataset.i18nHtml
+    if (htmlKey) el.innerHTML = t(htmlKey)
+    const attrSpec = el.dataset.i18nAttr
+    if (attrSpec) {
+      for (const pair of attrSpec.split(";")) {
+        const [attr, key] = pair.split(":").map((part) => part.trim())
+        if (attr && key) el.setAttribute(attr, t(key))
+      }
     }
   }
 }
