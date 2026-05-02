@@ -9,6 +9,7 @@ const isTauri =
 const STORAGE_KEY = "xt_prefs"
 const RECENT_CAP = 30
 const PROGRESS_CAP = 200
+const PROGRESS_STALE_AFTER_MS = 90 * 24 * 60 * 60 * 1000
 const COMPLETED_THRESHOLD = 0.95
 const EVT_FAV_CHANGED = "xt:favorites-changed"
 const EVT_REC_CHANGED = "xt:recents-changed"
@@ -605,11 +606,15 @@ export function getProgressFraction(playlistId, kind, id) {
 }
 
 function trimBucket(bucket) {
+  const cutoff = Date.now() - PROGRESS_STALE_AFTER_MS
+  for (const key of Object.keys(bucket)) {
+    if ((bucket[key]?.updatedAt || 0) < cutoff) delete bucket[key]
+  }
   const keys = Object.keys(bucket)
   if (keys.length <= PROGRESS_CAP) return
   keys.sort((a, b) => (bucket[a].updatedAt || 0) - (bucket[b].updatedAt || 0))
   const drop = keys.slice(0, keys.length - PROGRESS_CAP)
-  for (const k of drop) delete bucket[k]
+  for (const key of drop) delete bucket[key]
 }
 
 /**
