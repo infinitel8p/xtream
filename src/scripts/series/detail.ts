@@ -434,7 +434,8 @@ function applySeriesInfo(data) {
   // Poster: prefer the per-item API fields when the list-cache logo is
   // missing. info.cover is the standard Xtream key for series art.
   const apiName = info.name || info.title || ""
-  if (apiName && series && (!series.name || /^Series \d+$/.test(series.name))) {
+  const fallbackName = t("list.seriesFallback", { id: seriesId })
+  if (apiName && series && (!series.name || series.name === fallbackName)) {
     series.name = apiName
     if (titleEl) titleEl.textContent = apiName
   }

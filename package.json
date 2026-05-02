@@ -33,6 +33,7 @@
     "@tauri-apps/plugin-store": "^2.4.2",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "astro": "^6.2.0",
+    "dompurify": "^3.4.2",
     "marked": "^18.0.3",
     "svelte": "^5.55.5",
     "tailwindcss": "^4.2.4",

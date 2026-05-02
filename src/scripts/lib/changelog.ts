@@ -4,6 +4,7 @@
 // it does on the GitHub release page rather than appearing as raw text.
 
 import { marked } from "marked"
+import DOMPurify from "dompurify"
 
 const CACHE_KEY = "xt_changelog_cache"
 const CACHE_TTL_MS = 60 * 60 * 1000
@@ -79,15 +80,35 @@ marked.setOptions({
   breaks: false,
 })
 
+// Tags that GitHub's own release rendering allows and that we use in real
+// release bodies (centered hero image, collapsibles, badge tables). Anything
+// outside this list is stripped by DOMPurify rather than left to render.
+const ALLOWED_TAGS = [
+  "a", "abbr", "b", "blockquote", "br", "code", "del", "details", "div",
+  "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "ins", "kbd",
+  "li", "ol", "p", "pre", "s", "samp", "span", "strong", "sub", "summary",
+  "sup", "table", "tbody", "td", "tfoot", "th", "thead", "tr", "ul",
+]
+const ALLOWED_ATTR = [
+  "align", "alt", "checked", "class", "colspan", "disabled", "height",
+  "href", "id", "lang", "open", "rel", "rowspan", "src", "start", "target",
+  "title", "type", "width",
+]
+
 /**
  * Render a GitHub release body to HTML. Marked handles GFM markdown plus
  * the inline HTML blocks GitHub's release UI uses (centered hero image,
- * `<details>`/`<summary>` collapsibles, badge tables). Input comes from
- * the project's own GitHub releases via the API; the threat model assumes
- * an attacker would need to compromise the maintainer's GitHub account
- * before XSS in this view becomes the worst problem.
+ * `<details>`/`<summary>` collapsibles, badge tables). The output then runs
+ * through DOMPurify so a compromised release body (or a MITM on the
+ * unauthenticated API call) can't inject scripts, event handlers, or
+ * `javascript:` URLs into the settings page.
  */
 export function renderMarkdown(source: string): string {
   if (!source) return ""
-  return marked.parse(source) as string
+  const rendered = marked.parse(source) as string
+  return DOMPurify.sanitize(rendered, {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR,
+    ALLOW_DATA_ATTR: false,
+  })
 }
