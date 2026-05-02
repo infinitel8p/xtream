@@ -116,7 +116,8 @@ function applyVodInfo(data) {
   // been loaded yet). cover_big / movie_image / cover are the standard
   // Xtream keys.
   const apiName = movieData.name || info.name || ""
-  if (apiName && movie && (!movie.name || /^Movie \d+$/.test(movie.name))) {
+  const fallbackName = t("list.movieFallback", { id: movieId })
+  if (apiName && movie && (!movie.name || movie.name === fallbackName)) {
     movie.name = apiName
     if (titleEl) titleEl.textContent = apiName
   }

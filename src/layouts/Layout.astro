@@ -36,23 +36,40 @@ const documentTitle = pageTitle
         var currentTheme = localStorage.getItem("xt_theme") || "dark";
         if (currentTheme === "light") document.documentElement.style.colorScheme = "light";
         else if (currentTheme === "dark") document.documentElement.style.colorScheme = "dark";
+
+        function applyAndroidStatusBar(theme) {
+          try {
+            if (!window.AndroidStatusBar) return;
+            var isLight;
+            if (theme === "light") isLight = true;
+            else if (theme === "dark") isLight = false;
+            else isLight = !window.matchMedia("(prefers-color-scheme: dark)").matches;
+            window.AndroidStatusBar.setAppearance(isLight);
+          } catch (e) {}
+        }
+        applyAndroidStatusBar(currentTheme);
+        var systemThemeMql = window.matchMedia("(prefers-color-scheme: dark)");
+        if (systemThemeMql.addEventListener) {
+          systemThemeMql.addEventListener("change", function () {
+            var t = localStorage.getItem("xt_theme") || "dark";
+            if (t !== "light" && t !== "dark") applyAndroidStatusBar(t);
+          });
+        }
+        window.__applyAndroidStatusBar = applyAndroidStatusBar;
       } catch (e) {}
     </script>
   </head>
 
   <body
-    class="antialiased bg-bg text-fg selection:bg-accent-soft min-h-dvh
+    class="antialiased bg-bg text-fg selection:bg-accent-soft
+           h-dvh min-h-0 overflow-hidden
            flex flex-col md:flex-row landscape-phone:flex-row
-           md:h-dvh md:min-h-0 md:overflow-hidden
-           landscape-phone:h-dvh landscape-phone:min-h-0 landscape-phone:overflow-hidden
            pt-[env(safe-area-inset-top)]
            pr-[env(safe-area-inset-right)]"
   >
     <Sidebar />
     <div class="flex-1 min-w-0 min-h-0 flex flex-col order-first md:order-0
-                overflow-x-clip
-                md:overflow-y-auto
-                landscape-phone:overflow-y-auto">
+                overflow-x-clip overflow-y-auto">
       <slot />
     </div>
     <CatalogWarmingIndicator client:load />

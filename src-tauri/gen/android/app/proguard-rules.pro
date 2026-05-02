@@ -20,7 +20,5 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
--keep class com.infinitel8p.xtream.MainActivity { *; }
--keep class com.infinitel8p.xtream.MainActivity$* { *; }
--keep class com.infinitel8p.xtream.PipBridge { *; }
+-keep class com.infinitel8p.xtream.** { *; }
 -keep class * extends android.webkit.WebChromeClient { *; }

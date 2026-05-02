@@ -1197,6 +1197,9 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
       try {
         localStorage.setItem("xt_theme", t)
       } catch {}
+      try {
+        window.__applyAndroidStatusBar?.(t)
+      } catch {}
       syncThemeButtons()
     }
     function syncThemeButtons() {
