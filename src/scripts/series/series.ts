@@ -674,6 +674,25 @@ function appendNextPage() {
 
 function renderGrid() {
   if (!gridEl) return
+  // Skeleton -> real swap goes through View Transitions for a cinematic
+  // cross-fade. Filter / sort / category swaps stay snappy.
+  const wasSkeleton = !!gridEl.querySelector("[data-skeleton]")
+  const willShowReal = filtered.length > 0
+  const useVT =
+    wasSkeleton &&
+    willShowReal &&
+    typeof (document as any).startViewTransition === "function" &&
+    !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  const run = () => renderGridInner()
+  if (useVT) {
+    ;(document as any).startViewTransition(run)
+  } else {
+    run()
+  }
+}
+
+function renderGridInner() {
+  if (!gridEl) return
   ++renderToken
   teardownInfiniteObs()
   gridEl.replaceChildren()
@@ -1024,6 +1043,17 @@ if (listStatus && /no playlist selected/i.test(listStatus.textContent || "")) {
 }
 
 document.addEventListener("xt:active-changed", () => loadSeries())
+
+// Re-paint the skeleton wave when a manual catalog re-warm starts. Only
+// when the grid currently has no real cards.
+document.addEventListener("xt:catalog-warming-start", () => {
+  if (!gridEl) return
+  const hasReal = Array.from(gridEl.children).some(
+    (child) => !(child as HTMLElement).dataset.skeleton,
+  )
+  if (hasReal) return
+  renderPosterSkeletons(gridEl, posterSkeletonCount())
+})
 
 ;(async () => {
   await initI18n()

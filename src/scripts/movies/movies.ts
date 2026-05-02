@@ -586,6 +586,27 @@ function appendNextPage() {
 
 function renderGrid() {
   if (!gridEl) return
+  // If we're going from skeletons to real cards, run the swap inside a
+  // View Transition so the placeholders cinematically cross-fade into the
+  // real posters instead of snapping. Filter / sort / category changes
+  // (skeleton-less swaps) stay snappy and uninstrumented.
+  const wasSkeleton = !!gridEl.querySelector("[data-skeleton]")
+  const willShowReal = filtered.length > 0
+  const useVT =
+    wasSkeleton &&
+    willShowReal &&
+    typeof (document as any).startViewTransition === "function" &&
+    !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  const run = () => renderGridInner()
+  if (useVT) {
+    ;(document as any).startViewTransition(run)
+  } else {
+    run()
+  }
+}
+
+function renderGridInner() {
+  if (!gridEl) return
   ++renderToken
   teardownInfiniteObs()
   gridEl.replaceChildren()
@@ -944,6 +965,18 @@ if (listStatus && /no playlist selected/i.test(listStatus.textContent || "")) {
 }
 
 document.addEventListener("xt:active-changed", () => loadMovies())
+
+// Re-paint the skeleton wave when the user kicks off a manual catalog
+// re-warm (Refresh active in /settings). Only when the grid is currently
+// empty or already showing skeletons - never wipe real content.
+document.addEventListener("xt:catalog-warming-start", () => {
+  if (!gridEl) return
+  const hasReal = Array.from(gridEl.children).some(
+    (child) => !(child as HTMLElement).dataset.skeleton,
+  )
+  if (hasReal) return
+  renderPosterSkeletons(gridEl, posterSkeletonCount())
+})
 
 ;(async () => {
   await initI18n()

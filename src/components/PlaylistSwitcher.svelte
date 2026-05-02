@@ -250,22 +250,22 @@
           id="ps-refresh"
           type="button"
           onclick={onRefresh}
-          class="flex flex-1 items-center justify-center gap-1.5 px-2 py-3 text-sm font-medium text-fg-2 whitespace-nowrap
+          class="flex flex-1 min-w-0 items-center justify-center gap-1.5 px-2 py-3 text-sm font-medium text-fg-2 whitespace-nowrap
             hover:text-fg hover:bg-surface-2
             focus-visible:text-fg focus-visible:bg-surface-2
             min-h-11 transition-colors outline-none border-r border-line">
           <IconRefresh aria-hidden="true" class="h-4 w-4 shrink-0" />
-          <span data-i18n="common.refresh">Refresh</span>
+          <span data-i18n="common.refresh" class="truncate">Refresh</span>
         </button>
       {/if}
       <a
         href="/login"
-        class="flex flex-1 items-center justify-center gap-1.5 px-2 py-3 text-sm font-medium text-fg whitespace-nowrap
+        class="flex flex-1 min-w-0 items-center justify-center gap-1.5 px-2 py-3 text-sm font-medium text-fg whitespace-nowrap
           hover:bg-surface-2
           focus-visible:bg-surface-2
           min-h-11 transition-colors">
         <IconPlus aria-hidden="true" class="h-4 w-4 text-accent shrink-0" />
-        <span data-i18n="playlist.add">Add playlist</span>
+        <span data-i18n="playlist.add" class="truncate">Add playlist</span>
       </a>
     </div>
   </div>
