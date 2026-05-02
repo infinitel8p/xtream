@@ -29,6 +29,7 @@ import {
   IconBrandDiscord,
   IconInfoCircle,
   IconSparkles,
+  IconBolt,
 } from "@tabler/icons-svelte"
 import HiddenCategoriesEditor from "@/components/HiddenCategoriesEditor.svelte"
 import LocalePicker from "@/components/LocalePicker.svelte"
@@ -156,6 +157,46 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
                 var themeBtns = themeGroup.querySelectorAll(".theme-btn");
                 for (var j = 0; j < themeBtns.length; j++) {
                   themeBtns[j].setAttribute("aria-pressed", themeBtns[j].getAttribute("data-theme") === currentTheme ? "true" : "false");
+                }
+              }
+            } catch (e) {}
+          </script>
+        </article>
+
+        <!-- Performance mode: skip decorative animations + focus-glide for low-end TV WebViews -->
+        <article class="icon-mark-host rounded-2xl border border-line bg-surface p-5 sm:p-6 flex flex-col gap-4">
+          <div class="flex items-start gap-3">
+            <span class="icon-mark">
+              <IconBolt aria-hidden="true" stroke={2} />
+            </span>
+            <div class="flex flex-col gap-1 min-w-0">
+              <h3 data-i18n="settings.perfMode.title" class="text-base font-semibold">Performance mode</h3>
+              <p data-i18n="settings.perfMode.helperLong" class="text-xs text-fg-3">
+                Disables decorative animations (the comet in the sidebar, hub entry stagger, sliding focus ring) for smoother scrolling and D-pad navigation on TV boxes and low-end devices.
+              </p>
+            </div>
+          </div>
+          <div class="flex flex-col gap-2">
+            <span data-i18n="settings.perfMode.label" class="text-eyebrow font-medium uppercase text-fg-3">Performance mode</span>
+            <div
+              id="settings-perf-mode"
+              class="flex flex-wrap gap-2"
+              role="radiogroup"
+              aria-label="Performance mode"
+              data-i18n-attr="aria-label:settings.perfMode.label">
+              <button type="button" data-perf="on"  aria-pressed="false" data-i18n="settings.perfMode.on"  class="perf-mode-btn btn">On</button>
+              <button type="button" data-perf="off" aria-pressed="false" data-i18n="settings.perfMode.off" class="perf-mode-btn btn">Off</button>
+            </div>
+          </div>
+          <script is:inline>
+            try {
+              var perfOn = localStorage.getItem("xt_perf_mode") === "1";
+              var perfGroup = document.getElementById("settings-perf-mode");
+              if (perfGroup) {
+                var perfBtns = perfGroup.querySelectorAll(".perf-mode-btn");
+                for (var pIdx = 0; pIdx < perfBtns.length; pIdx++) {
+                  var perfBtnOn = perfBtns[pIdx].getAttribute("data-perf") === "on";
+                  perfBtns[pIdx].setAttribute("aria-pressed", perfBtnOn === perfOn ? "true" : "false");
                 }
               }
             } catch (e) {}
@@ -793,6 +834,8 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
       setDownloadDir,
       getDownloadConcurrency,
       setDownloadConcurrency,
+      getPerfMode,
+      setPerfMode,
     } from "@/scripts/lib/app-settings.js"
     import {
       ensureUserInfo,
@@ -1486,6 +1529,30 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
       applyTheme(btn.dataset.theme || "system", event.clientX, event.clientY)
     })
     syncThemeButtons()
+
+    // ---------------------------------------------------------------------
+    // Performance mode: persisted to xt_perf_mode; the inline script in
+    // Layout.astro mirrors it to `data-perf-mode` on <html> before paint
+    // so the brand-mark + entry animations don't flash on first frame.
+    // focus-glide.ts re-attaches/detaches its listeners on
+    // `xt:perf-mode-changed`, so toggling here takes effect immediately.
+    // ---------------------------------------------------------------------
+    const perfModeGroup = document.getElementById("settings-perf-mode")
+    function syncPerfModeButtons() {
+      const current = getPerfMode()
+      for (const btn of perfModeGroup?.querySelectorAll(".perf-mode-btn") || []) {
+        const isOn = btn.dataset.perf === "on"
+        btn.setAttribute("aria-pressed", String(isOn === current))
+      }
+    }
+    perfModeGroup?.addEventListener("click", (event) => {
+      const target = /** @type {HTMLElement} */ (event.target)
+      const btn = target.closest(".perf-mode-btn")
+      if (!btn) return
+      setPerfMode(btn.dataset.perf === "on")
+      syncPerfModeButtons()
+    })
+    syncPerfModeButtons()
 
     // ---------------------------------------------------------------------
     // Live TV layout: default EPG visibility + channel column width.

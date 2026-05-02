@@ -1,7 +1,9 @@
 const KEY_USER_AGENT = "xt_user_agent"
 const KEY_DOWNLOAD_DIR = "xt_download_dir"
 const KEY_DOWNLOAD_CONCURRENCY = "xt_download_concurrency"
+const KEY_PERF_MODE = "xt_perf_mode"
 const EVT_CHANGED = "xt:settings-changed"
+export const PERF_MODE_EVENT = "xt:perf-mode-changed"
 
 export const DEFAULT_DOWNLOAD_CONCURRENCY = 1
 export const MAX_DOWNLOAD_CONCURRENCY = 4
@@ -88,6 +90,26 @@ export function setDownloadConcurrency(n) {
       detail: { key: "downloadConcurrency", value: clamped },
     })
   )
+}
+
+// Performance mode: hides decorative SVG/CSS animations, skips the
+// focus-glide indicator, and pauses the hub tile-art rotator while the
+// document is hidden. Aimed at low-end TV WebViews. Mirrored to a
+// `data-perf-mode` attribute on `<html>` by the inline script in
+// Layout.astro so CSS rules apply before first paint.
+export function getPerfMode() {
+  return readLS(KEY_PERF_MODE, "") === "1"
+}
+
+export function setPerfMode(on) {
+  writeLS(KEY_PERF_MODE, on ? "1" : "")
+  if (typeof document !== "undefined") {
+    if (on) document.documentElement.setAttribute("data-perf-mode", "on")
+    else document.documentElement.removeAttribute("data-perf-mode")
+    document.dispatchEvent(
+      new CustomEvent(PERF_MODE_EVENT, { detail: { value: !!on } })
+    )
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -32,6 +32,9 @@ const documentTitle = pageTitle
         if (isFinite(cw) && cw >= 18 && cw <= 60) {
           document.documentElement.style.setProperty("--xt-channels-w", cw + "rem");
         }
+        if (localStorage.getItem("xt_perf_mode") === "1") {
+          document.documentElement.setAttribute("data-perf-mode", "on");
+        }
 
         var currentTheme = localStorage.getItem("xt_theme") || "dark";
         if (currentTheme === "light") document.documentElement.style.colorScheme = "light";

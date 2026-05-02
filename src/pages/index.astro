@@ -210,9 +210,9 @@ import {
 		</nav>
 
 		<ContinueWatching client:load />
-		<FavoritesStrip client:load />
-		<WatchlistStrip client:load />
-		<RecentlyAddedStrip client:load />
+		<FavoritesStrip client:idle />
+		<WatchlistStrip client:idle />
+		<RecentlyAddedStrip client:idle />
 
 		<div
 			id="app-version"
@@ -315,12 +315,10 @@ import {
 	const moviesTileArt = document.getElementById("movies-tile-art");
 	const seriesTileArt = document.getElementById("series-tile-art");
 
-	let rotatorTimer = null;
+	const rotators = [];
 	function stopRotator() {
-		if (rotatorTimer) {
-			clearInterval(rotatorTimer);
-			rotatorTimer = null;
-		}
+		for (const rotator of rotators) clearInterval(rotator);
+		rotators.length = 0;
 	}
 
 	function startRotator(el, urls) {
@@ -342,6 +340,7 @@ import {
 		layers[active].src = urls[0];
 		layers[active].dataset.on = "true";
 		const advance = () => {
+			if (document.hidden) return;
 			idx = (idx + 1) % urls.length;
 			const next = active === 0 ? 1 : 0;
 			layers[next].src = urls[idx];
@@ -349,8 +348,7 @@ import {
 			delete layers[active].dataset.on;
 			active = next;
 		};
-		const interval = setInterval(advance, 8000);
-		rotatorTimer = interval;
+		rotators.push(setInterval(advance, 8000));
 	}
 
 	function pickRandom(arr, count) {

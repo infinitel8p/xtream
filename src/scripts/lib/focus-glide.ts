@@ -130,9 +130,11 @@ function onScrollOrResize() {
   }
 }
 
-export function initFocusGlide() {
-  if (typeof window === "undefined") return
-  if (!window.matchMedia("(min-width: 48em)").matches) return
+let attached = false
+
+function attach() {
+  if (attached) return
+  attached = true
   document.addEventListener("focusin", onFocus, true)
   document.addEventListener("focusout", onBlur, true)
   document.addEventListener("pointerdown", onPointer, true)
@@ -140,4 +142,36 @@ export function initFocusGlide() {
   document.addEventListener("keydown", onKey, true)
   window.addEventListener("scroll", onScrollOrResize, { passive: true, capture: true })
   window.addEventListener("resize", onScrollOrResize)
+}
+
+function detach() {
+  if (!attached) return
+  attached = false
+  document.removeEventListener("focusin", onFocus, true)
+  document.removeEventListener("focusout", onBlur, true)
+  document.removeEventListener("pointerdown", onPointer, true)
+  document.removeEventListener("pointermove", onPointer, true)
+  document.removeEventListener("keydown", onKey, true)
+  window.removeEventListener("scroll", onScrollOrResize, true)
+  window.removeEventListener("resize", onScrollOrResize)
+  cancelAnimationFrame(rafId)
+  hideIndicator()
+}
+
+function isPerfMode(): boolean {
+  try {
+    return localStorage.getItem("xt_perf_mode") === "1"
+  } catch {
+    return false
+  }
+}
+
+export function initFocusGlide() {
+  if (typeof window === "undefined") return
+  if (!window.matchMedia("(min-width: 48em)").matches) return
+  if (!isPerfMode()) attach()
+  document.addEventListener("xt:perf-mode-changed", () => {
+    if (isPerfMode()) detach()
+    else attach()
+  })
 }

@@ -71,10 +71,21 @@
 
   onMount(() => {
     reload()
+    // `xt:catalog-warmed` fires once per kind, so up to 4 events arrive in
+    // rapid succession; rAF dedupe collapses them into a single reload.
+    let pendingReload = false
+    function scheduleReload() {
+      if (pendingReload) return
+      pendingReload = true
+      requestAnimationFrame(async () => {
+        pendingReload = false
+        await reload()
+      })
+    }
     const onLocaleChange = () => { locale++ }
     const handlers = {
-      "xt:active-changed": reload,
-      "xt:catalog-warmed": reload,
+      "xt:active-changed": scheduleReload,
+      "xt:catalog-warmed": scheduleReload,
       [LOCALE_EVENT]: onLocaleChange,
     }
     for (const [eventName, handler] of Object.entries(handlers)) {

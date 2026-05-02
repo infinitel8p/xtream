@@ -102,10 +102,18 @@
   onMount(() => {
     reload()
     // Catalog-changing events: invalidate lookup Maps before reloading.
-    async function onCatalogChanged() {
-      lookups = null
-      lookupsForPlaylistId = ""
-      await reload()
+    // `xt:catalog-warmed` fires once per kind, so up to 4 events arrive in
+    // rapid succession; rAF dedupe collapses them into a single reload.
+    let pendingCatalog = false
+    function onCatalogChanged() {
+      if (pendingCatalog) return
+      pendingCatalog = true
+      requestAnimationFrame(async () => {
+        pendingCatalog = false
+        lookups = null
+        lookupsForPlaylistId = ""
+        await reload()
+      })
     }
     // Favorites-only events: keep lookups, just rebuild the entries list.
     const onLocaleChange = () => { locale++ }
