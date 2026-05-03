@@ -490,6 +490,296 @@ export async function testM3UUrl(url) {
 }
 
 // ---------------------------------------------------------------------------
+// Multi-step connection diagnostic wizard
+// ---------------------------------------------------------------------------
+
+const FETCH_TIMEOUT_MS = 12_000
+
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label || "Request"} timed out after ${ms}ms`))
+    }, ms)
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value) },
+      (error) => { clearTimeout(timer); reject(error) }
+    )
+  })
+}
+
+/**
+ * Redact credentials from a URL or text by replacing username/password
+ * query params with asterisks. Returns a sanitized copy.
+ */
+function redactCredentials(text) {
+  if (!text) return text
+  try {
+    const u = new URL(text)
+    if (u.search) {
+      u.search = u.search.replace(/(username|password)=[^&]*/gi, "$1=***")
+      return u.toString()
+    }
+  } catch { /* not a URL, return as-is */ }
+  return text
+}
+
+/**
+ * Multi-step connection diagnostic for Xtream playlists.
+ * Returns a structured report with per-step results.
+ *
+ * @param {{ serverUrl: string, username: string, password: string }} creds
+ * @returns {Promise<{ steps: StepResult[], verdict: string, message: string, accountInfo?: any }>} */
+export async function testConnectionWizard(creds) {
+  const steps = []
+  const addStep = (name, status, latencyMs, bytes, detail, raw) => {
+    steps.push({ name, status, latencyMs, bytes, detail, raw: raw ? redactCredentials(raw) : null })
+  }
+
+  const { providerFetch } = await import("./provider-fetch.js")
+  const base = safeHttpUrl(creds.serverUrl)
+  if (!base) {
+    addStep("URL validation", "fail", 0, 0, "Invalid server URL.")
+    return { steps, verdict: "invalid", message: "Invalid server URL." }
+  }
+
+  const apiCreds = { host: creds.serverUrl, port: "", user: creds.username, pass: creds.password }
+
+  // Step 1: HTTP connectivity — HEAD to base URL
+  try {
+    const t0 = performance.now()
+    const r = await withTimeout(providerFetch(base, { method: "HEAD" }), FETCH_TIMEOUT_MS, "HTTP connectivity")
+    const latency = Math.round(performance.now() - t0)
+    addStep("Server reachable", r.ok ? "pass" : "warn", latency, 0,
+      `HTTP ${r.status} ${r.statusText}`, null)
+  } catch (e) {
+    const latency = Math.round(performance.now() - (steps.length ? 0 : performance.now()))
+    addStep("Server reachable", "fail", latency, 0,
+      String(e.message || e), null)
+  }
+
+  // Step 2: Authentication — get_account_info
+  try {
+    const t0 = performance.now()
+    const url = buildApiUrl(apiCreds, "get_account_info")
+    const r = await withTimeout(providerFetch(url), FETCH_TIMEOUT_MS, "Authentication")
+    const latency = Math.round(performance.now() - t0)
+    if (!r.ok) {
+      const body = await r.text().catch(() => "")
+      addStep("Authentication", "fail", latency, body.length,
+        `HTTP ${r.status} ${r.statusText}`, body)
+    } else {
+      const body = await r.text().catch(() => "")
+      let data = null
+      try { data = JSON.parse(body) } catch {}
+      const info = data?.user_info
+      const status = info?.status || "Unknown"
+      const isOk = status === "Active"
+      addStep("Authentication", isOk ? "pass" : "warn", latency, body.length,
+        `Account status: ${status}`, body)
+      if (!isOk && data?.user_info) {
+        return { steps, verdict: isOk ? "ok" : "expired", message: `Account is ${status.toLowerCase()}.`, accountInfo: data.user_info }
+      }
+    }
+  } catch (e) {
+    addStep("Authentication", "fail", 0, 0,
+      String(e.message || e), null)
+  }
+
+  // Step 3: Account info — parse from the same response
+  try {
+    const url = buildApiUrl(apiCreds, "get_account_info")
+    const t0 = performance.now()
+    const r = await withTimeout(providerFetch(url), FETCH_TIMEOUT_MS, "Account info")
+    const latency = Math.round(performance.now() - t0)
+    if (!r.ok) {
+      addStep("Account info", "fail", latency, 0, "Unable to fetch account details.", null)
+    } else {
+      const body = await r.text().catch(() => "")
+      let data = null
+      try { data = JSON.parse(body) } catch {}
+      const info = data?.user_info || {}
+      const server = data?.server_info || {}
+      const maxConn = info.max_connections ?? "—"
+      const activeConn = info.active_cons ?? "—"
+      const expTs = parseInt(info.exp_date ?? "", 10)
+      const expDate = Number.isFinite(expTs) ? new Date(expTs * 1000).toLocaleDateString() : "—"
+      const osName = server.os_name || "—"
+      const serverUrl = server.server_protocol ? `${server.server_protocol}://${server.server_url}` : "—"
+      const detail = `Max connections: ${maxConn} · Active: ${activeConn} · Expires: ${expDate} · OS: ${osName} · Server: ${serverUrl}`
+      addStep("Account info", "pass", latency, body.length, detail, body)
+    }
+  } catch (e) {
+    addStep("Account info", "fail", 0, 0,
+      String(e.message || e), null)
+  }
+
+  // Step 4: Live categories
+  try {
+    const t0 = performance.now()
+    const url = buildApiUrl(apiCreds, "get_live_categories")
+    const r = await withTimeout(providerFetch(url), FETCH_TIMEOUT_MS, "Live categories")
+    const latency = Math.round(performance.now() - t0)
+    if (!r.ok) {
+      const body = await r.text().catch(() => "")
+      addStep("Live categories", "fail", latency, body.length,
+        `HTTP ${r.status} ${r.statusText}`, body)
+    } else {
+      const body = await r.text().catch(() => "")
+      const data = JSON.parse(body)
+      const arr = Array.isArray(data) ? data : data?.categories || []
+      addStep("Live categories", "pass", latency, body.length,
+        `Found ${arr.length} category${arr.length === 1 ? "" : "s"}.`, body)
+    }
+  } catch (e) {
+    addStep("Live categories", "fail", 0, 0,
+      String(e.message || e), null)
+  }
+
+  // Step 5: Live streams
+  try {
+    const t0 = performance.now()
+    const url = buildApiUrl(apiCreds, "get_live_streams")
+    const r = await withTimeout(providerFetch(url), FETCH_TIMEOUT_MS, "Live streams")
+    const latency = Math.round(performance.now() - t0)
+    if (!r.ok) {
+      const body = await r.text().catch(() => "")
+      addStep("Live streams", "fail", latency, body.length,
+        `HTTP ${r.status} ${r.statusText}`, body)
+    } else {
+      const body = await r.text().catch(() => "")
+      const data = JSON.parse(body)
+      const arr = Array.isArray(data) ? data : data?.streams || data?.results || []
+      addStep("Live streams", "pass", latency, body.length,
+        `Found ${arr.length} channel${arr.length === 1 ? "" : "s"}.`, body)
+    }
+  } catch (e) {
+    addStep("Live streams", "fail", 0, 0,
+      String(e.message || e), null)
+  }
+
+  // Step 6: VOD streams
+  try {
+    const t0 = performance.now()
+    const url = buildApiUrl(apiCreds, "get_vod_streams")
+    const r = await withTimeout(providerFetch(url), FETCH_TIMEOUT_MS, "VOD streams")
+    const latency = Math.round(performance.now() - t0)
+    if (!r.ok) {
+      const body = await r.text().catch(() => "")
+      addStep("VOD streams", "fail", latency, body.length,
+        `HTTP ${r.status} ${r.statusText}`, body)
+    } else {
+      const body = await r.text().catch(() => "")
+      const data = JSON.parse(body)
+      const arr = Array.isArray(data) ? data : data?.movies || data?.results || []
+      addStep("VOD streams", "pass", latency, body.length,
+        `Found ${arr.length} VOD${arr.length === 1 ? "" : "s"}.`, body)
+    }
+  } catch (e) {
+    addStep("VOD streams", "fail", 0, 0,
+      String(e.message || e), null)
+  }
+
+  // Step 7: Series
+  try {
+    const t0 = performance.now()
+    const url = buildApiUrl(apiCreds, "get_series")
+    const r = await withTimeout(providerFetch(url), FETCH_TIMEOUT_MS, "Series")
+    const latency = Math.round(performance.now() - t0)
+    if (!r.ok) {
+      const body = await r.text().catch(() => "")
+      addStep("Series", "fail", latency, body.length,
+        `HTTP ${r.status} ${r.statusText}`, body)
+    } else {
+      const body = await r.text().catch(() => "")
+      const data = JSON.parse(body)
+      const arr = Array.isArray(data) ? data : data?.series || data?.results || []
+      addStep("Series", "pass", latency, body.length,
+        `Found ${arr.length} series${arr.length === 1 ? "" : "s"}.`, body)
+    }
+  } catch (e) {
+    addStep("Series", "fail", 0, 0,
+      String(e.message || e), null)
+  }
+
+  // Compute verdict
+  const allPass = steps.every((s) => s.status === "pass")
+  const anyFail = steps.some((s) => s.status === "fail")
+  const anyWarn = steps.some((s) => s.status === "warn")
+
+  let verdict, message
+  if (anyFail) {
+    const failStep = steps.find((s) => s.status === "fail")
+    verdict = "fail"
+    message = `${failStep.name} failed: ${failStep.detail}`
+  } else if (anyWarn) {
+    verdict = "warn"
+    message = "Connection works but account may not be active."
+  } else {
+    verdict = "ok"
+    message = "All checks passed."
+  }
+
+  return { steps, verdict, message }
+}
+
+/**
+ * Multi-step connection diagnostic for M3U playlists.
+ */
+export async function testM3UConnectionWizard(url) {
+  const steps = []
+  const addStep = (name, status, latencyMs, bytes, detail, raw) => {
+    steps.push({ name, status, latencyMs, bytes, detail, raw: raw ? raw.slice(0, 4096) : null })
+  }
+
+  if (!url || !/^https?:\/\//i.test(url)) {
+    addStep("URL validation", "fail", 0, 0, "URL must start with http(s)://.")
+    return { steps, verdict: "invalid", message: "Invalid M3U URL." }
+  }
+
+  const { providerFetch } = await import("./provider-fetch.js")
+
+  // Step 1: HTTP connectivity
+  try {
+    const t0 = performance.now()
+    const r = await withTimeout(providerFetch(url), FETCH_TIMEOUT_MS, "Playlist fetch")
+    const latency = Math.round(performance.now() - t0)
+    if (!r.ok) {
+      addStep("Playlist fetch", "fail", latency, 0,
+        `HTTP ${r.status} ${r.statusText}`)
+      return { steps, verdict: "fail", message: `HTTP ${r.status} ${r.statusText}` }
+    }
+    addStep("Playlist fetch", "pass", latency, 0,
+      `HTTP ${r.status} ${r.statusText}`)
+  } catch (e) {
+    addStep("Playlist fetch", "fail", 0, 0,
+      String(e.message || e))
+    return { steps, verdict: "fail", message: String(e.message || e) }
+  }
+
+  // Step 2: Playlist validation
+  try {
+    const r = await providerFetch(url)
+    const text = await r.text()
+    const head = text.slice(0, 4096)
+    const looksLikeM3U = head.includes("#EXTM3U") || /#EXTINF\s*:/i.test(head)
+    if (!looksLikeM3U) {
+      addStep("Playlist validation", "fail", 0, text.length,
+        "Response doesn't look like an M3U playlist.", text)
+      return { steps, verdict: "fail", message: "Not a valid M3U playlist." }
+    }
+    const matches = text.match(/#EXTINF\s*:/gi)
+    const count = matches ? matches.length : 0
+    addStep("Playlist validation", "pass", 0, text.length,
+      `Found ${count} entry${count === 1 ? "" : "s"}.`, text)
+  } catch (e) {
+    addStep("Playlist validation", "fail", 0, 0,
+      String(e.message || e))
+  }
+
+  return { steps, verdict: "ok", message: "Playlist looks good." }
+}
+
+// ---------------------------------------------------------------------------
 // Misc helpers
 // ---------------------------------------------------------------------------
 const DIACRITICS = /[\u0300-\u036F]/g

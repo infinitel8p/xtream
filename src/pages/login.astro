@@ -192,6 +192,8 @@ import { IconArrowLeft } from "@tabler/icons-svelte";
 		parseXtreamUrl,
 		testXtreamConnection,
 		testM3UUrl,
+		testConnectionWizard,
+		testM3UConnectionWizard,
 		isTauri,
 	} from "@/scripts/lib/creds.js";
 
@@ -302,6 +304,75 @@ import { IconArrowLeft } from "@tabler/icons-svelte";
 		}
 	}
 
+	/** Render the full wizard result as step-by-step HTML inside #status. */
+	function renderWizardResult(result) {
+		if (!result) return
+		const wasHidden = statusEl.classList.contains("hidden");
+		statusEl.classList.remove("hidden");
+		statusEl.classList.add("flex");
+		// Reset palette classes.
+		statusEl.className =
+			"flex flex-col gap-2 rounded-xl border px-3.5 py-3 text-sm leading-relaxed ";
+
+		// Verdict bar
+		const verdictPalette = {
+			ok: "border-ok/40 bg-ok/5 text-ok",
+			warn: "border-warn/40 bg-warn/5 text-warn",
+			fail: "border-bad/40 bg-bad/5 text-bad",
+			invalid: "border-bad/40 bg-bad/5 text-bad",
+		};
+		statusEl.className += verdictPalette[result.verdict] || verdictPalette.fail;
+
+		const icon = result.verdict === "ok" ? "✓" : result.verdict === "warn" ? "⚠" : "✗";
+		let html = `<div class="flex items-center gap-2 font-semibold">${icon} ${escapeText(result.message)}</div>`;
+
+		// Step rows
+		for (const step of result.steps) {
+			const stepIcon = step.status === "pass" ? "✓" : step.status === "warn" ? "⚠" : "✗";
+			const stepColor = step.status === "pass" ? "text-ok" : step.status === "warn" ? "text-warn" : "text-bad";
+			const latency = step.latencyMs ? ` · ${step.latencyMs}ms` : "";
+			const bytes = step.bytes ? ` · ${fmtBytes(step.bytes)}` : "";
+			html += `
+				<div class="flex items-start gap-2 pl-2">
+					<span class="mt-0.5 ${stepColor} shrink-0" aria-hidden="true">${stepIcon}</span>
+					<div class="min-w-0">
+						<span class="font-medium">${escapeText(step.name)}</span>
+						<span class="text-fg-3 tabular-nums">${latency}${bytes}</span>
+						${step.detail ? `<div class="text-2xs text-fg-3 mt-0.5 leading-relaxed">${escapeText(step.detail)}</div>` : ""}
+						${step.raw ? `
+							<details class="mt-1">
+								<summary class="text-2xs text-fg-3 cursor-pointer hover:text-fg-2">View raw response (${step.raw.length} chars)</summary>
+								<pre class="mt-1 text-2xs text-fg-3 font-mono break-all whitespace-pre-wrap max-h-48 overflow-auto custom-scroll">${escapeHtml(step.raw)}</pre>
+							</details>
+							` : ""}
+					</div>
+				</div>
+			`;
+		}
+		statusEl.innerHTML = html;
+		if (wasHidden) {
+			statusEl.classList.remove("status-enter");
+			void statusEl.offsetWidth;
+			statusEl.classList.add("status-enter");
+		}
+	}
+
+	function fmtBytes(n) {
+		if (!n) return "0 B";
+		if (n < 1024) return `${n} B`;
+		if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+		return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+	}
+
+	function escapeHtml(s) {
+		return String(s).replace(/[&<>"']/g, (c) =>
+			c === "&" ? "&amp;" :
+			c === "<" ? "&lt;" :
+			c === ">" ? "&gt;" :
+			c === '"' ? "&quot;" : "&#39;"
+		);
+	}
+
 	function escapeText(s) {
 		const d = document.createElement("div");
 		d.textContent = s;
@@ -343,50 +414,21 @@ import { IconArrowLeft } from "@tabler/icons-svelte";
 					return;
 				}
 				showStatus("busy", "Testing connection…");
-				const r = await testXtreamConnection({
+				const result = await testConnectionWizard({
 					serverUrl,
 					username,
 					password,
 				});
-				const exp = r.expDate
-					? ` Expires ${new Date(r.expDate).toLocaleDateString()}.`
-					: "";
-				switch (r.status) {
-					case "active":
-						showStatus("active", `Connected. Account is active.${exp}`);
-						break;
-					case "expired":
-						showStatus("expired", `Account expired.${exp}`);
-						break;
-					case "inactive":
-						showStatus("inactive", `Account is inactive.${exp}`);
-						break;
-					default:
-						showStatus(
-							"unavailable",
-							`Couldn't reach the server${r.message ? ` - ${r.message}` : "."}${privateHostHint(serverUrl)}`
-						);
-				}
+				renderWizardResult(result);
 			} else {
 				const url = m3uEl.value.trim();
 				if (!url) {
 					showStatus("unavailable", "Please enter an M3U URL.");
 					return;
 				}
-				showStatus("busy", "Fetching playlist…");
-				const r = await testM3UUrl(url);
-				if (r.status === "active") {
-					const n = r.count || 0;
-					showStatus(
-						"active",
-						`Playlist looks good${n ? ` - ${n.toLocaleString()} entries.` : "."}`
-					);
-				} else {
-					showStatus(
-						"unavailable",
-						`Couldn't fetch the playlist${r.message ? ` - ${r.message}` : "."}${privateHostHint(url)}`
-					);
-				}
+				showStatus("busy", "Testing playlist…");
+				const result = await testM3UConnectionWizard(url);
+				renderWizardResult(result);
 			}
 		} finally {
 			testBtn.disabled = false;
