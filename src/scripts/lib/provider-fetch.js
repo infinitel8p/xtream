@@ -22,6 +22,15 @@ async function nativeFetch(url, init, u) {
   try {
     const r = await fetch(url, init)
     console.log(`[xt:net] native ok ${r.status}`, u)
+    // Capture CORS-related headers for diagnostic use
+    const corsHeaders = {}
+    for (const key of ["access-control-allow-origin", "access-control-allow-credentials", "access-control-allow-methods", "access-control-allow-headers", "access-control-expose-headers"]) {
+      const val = r.headers.get(key)
+      if (val) corsHeaders[key] = val
+    }
+    if (Object.keys(corsHeaders).length) {
+      Object.defineProperty(r, "_corsHeaders", { value: corsHeaders, writable: false, enumerable: false })
+    }
     return r
   } catch (e) {
     if (!init?.signal?.aborted) {
