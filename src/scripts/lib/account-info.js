@@ -73,6 +73,23 @@ export function getActiveConnectionsSync(playlistId) {
   return Number.isFinite(n) && n >= 0 ? n : 0
 }
 
+/**
+ * Check if the playlist is approaching or at its connection limit.
+ * Returns null when unknown, or an object with level and message.
+ */
+export function getConnectionLimitWarning(playlistId) {
+  const max = getMaxConnectionsSync(playlistId)
+  const active = getActiveConnectionsSync(playlistId)
+  if (max <= 0) return null
+  if (active >= max) {
+    return { level: "critical", message: `Connection limit reached (${active}/${max}) — streams may fail.` }
+  }
+  if (active >= max * 0.8) {
+    return { level: "warning", message: `Approaching connection limit (${active}/${max}) — other devices may be using slots.` }
+  }
+  return null
+}
+
 /** Account expiration as ms-since-epoch, or null when unknown / lifetime. */
 export function getExpirationMsSync(playlistId) {
   const info = getCachedUserInfoSync(playlistId)
