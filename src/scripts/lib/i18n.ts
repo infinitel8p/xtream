@@ -56,6 +56,7 @@ function isLocaleCode(code: string): code is LocaleCode {
 }
 
 const LOCALE_STORAGE_KEY = "xt_locale"
+const LOCALE_MESSAGES_STORAGE_KEY = "xt_locale_messages_v1"
 const LOCALE_CHANGED_EVENT = "xt:locale-changed"
 
 const cache = new Map<string, LocaleMessages>()
@@ -116,6 +117,43 @@ function writePersistedLocale(code: string | null): void {
   }
 }
 
+function writeCachedMessages(code: string, messages: LocaleMessages): void {
+  try {
+    if (typeof localStorage === "undefined") return
+    if (code === "en") {
+      localStorage.removeItem(LOCALE_MESSAGES_STORAGE_KEY)
+      return
+    }
+    localStorage.setItem(
+      LOCALE_MESSAGES_STORAGE_KEY,
+      JSON.stringify({ code, messages })
+    )
+  } catch {
+    /* ignore quota / privacy-mode errors */
+  }
+}
+
+function readCachedMessages(): { code: LocaleCode; messages: LocaleMessages } | null {
+  try {
+    if (typeof localStorage === "undefined") return null
+    const raw = localStorage.getItem(LOCALE_MESSAGES_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (
+      parsed &&
+      typeof parsed.code === "string" &&
+      isLocaleCode(parsed.code) &&
+      parsed.messages &&
+      typeof parsed.messages === "object"
+    ) {
+      return { code: parsed.code, messages: parsed.messages as LocaleMessages }
+    }
+  } catch {
+    /* corrupt cache - bundled async loader will recover */
+  }
+  return null
+}
+
 function detectLocale(): LocaleCode {
   const persisted = readPersistedLocale()
   if (persisted && isLocaleCode(persisted)) return persisted
@@ -146,12 +184,7 @@ export async function setLocale(input: string | null): Promise<void> {
   }
   activeCode = code
   activeMessages = cache.get(code)!
-  // Persistence policy: only write the key when the chosen locale differs from
-  // what auto-detect would pick *and* there isn't already a stored override.
-  // This keeps localStorage clean for users who never deviate from their
-  // browser default. NB: detectLocale() reads readPersistedLocale() internally,
-  // so the order matters - we evaluate detectLocale() with the storage in
-  // whatever state it was after the (code === null) branch above.
+  writeCachedMessages(code, activeMessages)
   const matchesAutoDetect = code === detectLocale() && !readPersistedLocale()
   writePersistedLocale(matchesAutoDetect ? null : code)
   if (typeof document !== "undefined") {
@@ -197,14 +230,11 @@ export function applyI18nDOM(root: ParentNode = document): void {
 
 let _initPromise: Promise<void> | null = null
 
-/**
- * Initialise i18n at app boot. Idempotent: callers across modules share a
- * single in-flight promise. Page modules that read translations
- * synchronously should `await initI18n()` first to avoid an English flash
- * before the locale JSON resolves.
- */
+// Initialise i18n at app boot
 export function initI18n(): Promise<void> {
   if (!_initPromise) {
+    const cached = readCachedMessages()
+    if (cached && !cache.has(cached.code)) cache.set(cached.code, cached.messages)
     const code = detectLocale()
     _initPromise = setLocale(code === "en" ? "en" : code)
   }
