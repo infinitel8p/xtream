@@ -492,6 +492,24 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
             id="settings-cache-msg"
             aria-live="polite"
             class="text-xs text-fg-3 transition-opacity duration-300 empty:hidden"></span>
+
+          <div class="flex flex-col gap-2 pt-2 border-t border-line/60">
+            <span data-i18n="settings.progressRetention.label" class="text-eyebrow font-medium uppercase text-fg-3">Continue Watching retention</span>
+            <p data-i18n="settings.progressRetention.helper" class="text-xs text-fg-3">
+              How long to keep paused movies and episodes in Continue Watching. Older entries are dropped on the next save. The 200-item cap still applies regardless.
+            </p>
+            <div
+              id="settings-progress-retention"
+              class="flex flex-wrap gap-2"
+              role="radiogroup"
+              aria-label="Continue Watching retention"
+              data-i18n-attr="aria-label:settings.progressRetention.label">
+              <button type="button" data-retention="30"  aria-pressed="false" data-i18n="settings.progressRetention.30days"  class="retention-btn btn">30 days</button>
+              <button type="button" data-retention="90"  aria-pressed="false" data-i18n="settings.progressRetention.90days"  class="retention-btn btn">90 days</button>
+              <button type="button" data-retention="180" aria-pressed="false" data-i18n="settings.progressRetention.180days" class="retention-btn btn">180 days</button>
+              <button type="button" data-retention="0"   aria-pressed="false" data-i18n="settings.progressRetention.never"   class="retention-btn btn">Never</button>
+            </div>
+          </div>
         </article>
 
         <!-- Hidden categories editor -->
@@ -836,6 +854,8 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
       setDownloadConcurrency,
       getPerfMode,
       setPerfMode,
+      getProgressRetentionDays,
+      setProgressRetentionDays,
     } from "@/scripts/lib/app-settings.js"
     import {
       ensureUserInfo,
@@ -1553,6 +1573,30 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
       syncPerfModeButtons()
     })
     syncPerfModeButtons()
+
+    // ---------------------------------------------------------------------
+    // Continue Watching retention: 30 / 90 / 180 days or Never. Read by
+    // trimBucket() in preferences.js on every progress save, so flipping
+    // here takes effect on the next playback tick - no reload required.
+    // ---------------------------------------------------------------------
+    const retentionGroup = document.getElementById("settings-progress-retention")
+    function syncRetentionButtons() {
+      const current = String(getProgressRetentionDays())
+      for (const btn of retentionGroup?.querySelectorAll(".retention-btn") || []) {
+        btn.setAttribute(
+          "aria-pressed",
+          String(btn.dataset.retention === current)
+        )
+      }
+    }
+    retentionGroup?.addEventListener("click", (event) => {
+      const target = /** @type {HTMLElement} */ (event.target)
+      const btn = target.closest(".retention-btn")
+      if (!btn) return
+      setProgressRetentionDays(Number(btn.dataset.retention))
+      syncRetentionButtons()
+    })
+    syncRetentionButtons()
 
     // ---------------------------------------------------------------------
     // Live TV layout: default EPG visibility + channel column width.

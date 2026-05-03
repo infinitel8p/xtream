@@ -2,12 +2,15 @@ const KEY_USER_AGENT = "xt_user_agent"
 const KEY_DOWNLOAD_DIR = "xt_download_dir"
 const KEY_DOWNLOAD_CONCURRENCY = "xt_download_concurrency"
 const KEY_PERF_MODE = "xt_perf_mode"
+const KEY_PROGRESS_RETENTION = "xt_progress_retention_days"
 const EVT_CHANGED = "xt:settings-changed"
-export const PERF_MODE_EVENT = "xt:perf-mode-changed"
 
+export const PERF_MODE_EVENT = "xt:perf-mode-changed"
+export const PROGRESS_RETENTION_EVENT = "xt:progress-retention-changed"
+export const PROGRESS_RETENTION_VALUES = [30, 90, 180, 0]
+export const DEFAULT_PROGRESS_RETENTION_DAYS = 90
 export const DEFAULT_DOWNLOAD_CONCURRENCY = 1
 export const MAX_DOWNLOAD_CONCURRENCY = 4
-
 export const UA_PRESETS = [
   { id: "default", label: "Default (browser/WebView)", value: "" },
   {
@@ -108,6 +111,32 @@ export function setPerfMode(on) {
     else document.documentElement.removeAttribute("data-perf-mode")
     document.dispatchEvent(
       new CustomEvent(PERF_MODE_EVENT, { detail: { value: !!on } })
+    )
+  }
+}
+
+// Continue Watching retention
+export function getProgressRetentionDays() {
+  const raw = readLS(KEY_PROGRESS_RETENTION, "")
+  const parsed = parseInt(raw, 10)
+  if (!Number.isFinite(parsed) || !PROGRESS_RETENTION_VALUES.includes(parsed)) {
+    return DEFAULT_PROGRESS_RETENTION_DAYS
+  }
+  return parsed
+}
+
+export function setProgressRetentionDays(days) {
+  const normalised = PROGRESS_RETENTION_VALUES.includes(Number(days))
+    ? Number(days)
+    : DEFAULT_PROGRESS_RETENTION_DAYS
+  if (normalised === DEFAULT_PROGRESS_RETENTION_DAYS) {
+    writeLS(KEY_PROGRESS_RETENTION, "")
+  } else {
+    writeLS(KEY_PROGRESS_RETENTION, String(normalised))
+  }
+  if (typeof document !== "undefined") {
+    document.dispatchEvent(
+      new CustomEvent(PROGRESS_RETENTION_EVENT, { detail: { value: normalised } })
     )
   }
 }

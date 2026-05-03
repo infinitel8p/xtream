@@ -151,12 +151,20 @@
   onMount(() => {
     reload()
     const onLocale = () => { locale++ }
+    let warmedRaf = 0
+    const onCatalogWarmed = () => {
+      if (warmedRaf) return
+      warmedRaf = requestAnimationFrame(() => {
+        warmedRaf = 0
+        reload()
+      })
+    }
     const handlers = {
       "xt:active-changed": reload,
       "xt:entries-updated": reload,
       "xt:favorites-changed": reload,
       "xt:favorites-order-changed": reload,
-      "xt:catalog-warmed": reload,
+      "xt:catalog-warmed": onCatalogWarmed,
       [LOCALE_EVENT]: onLocale,
     }
     for (const [eventName, handler] of Object.entries(handlers)) {
@@ -166,6 +174,7 @@
       for (const [eventName, handler] of Object.entries(handlers)) {
         document.removeEventListener(eventName, handler)
       }
+      if (warmedRaf) cancelAnimationFrame(warmedRaf)
     }
   })
 </script>

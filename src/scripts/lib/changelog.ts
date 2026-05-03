@@ -80,9 +80,12 @@ marked.setOptions({
   breaks: false,
 })
 
-// Tags that GitHub's own release rendering allows and that we use in real
-// release bodies (centered hero image, collapsibles, badge tables). Anything
-// outside this list is stripped by DOMPurify rather than left to render.
+DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+  if (node instanceof Element && node.tagName === "A" && node.getAttribute("target") === "_blank") {
+    node.setAttribute("rel", "noopener noreferrer")
+  }
+})
+
 const ALLOWED_TAGS = [
   "a", "abbr", "b", "blockquote", "br", "code", "del", "details", "div",
   "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "ins", "kbd",
@@ -95,17 +98,9 @@ const ALLOWED_ATTR = [
   "title", "type", "width",
 ]
 
-/**
- * Render a GitHub release body to HTML. Marked handles GFM markdown plus
- * the inline HTML blocks GitHub's release UI uses (centered hero image,
- * `<details>`/`<summary>` collapsibles, badge tables). The output then runs
- * through DOMPurify so a compromised release body (or a MITM on the
- * unauthenticated API call) can't inject scripts, event handlers, or
- * `javascript:` URLs into the settings page.
- */
 export function renderMarkdown(source: string): string {
   if (!source) return ""
-  const rendered = marked.parse(source) as string
+  const rendered = marked.parse(source, { async: false }) as string
   return DOMPurify.sanitize(rendered, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,

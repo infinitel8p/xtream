@@ -1,6 +1,7 @@
 // Per-playlist favorites + recently-played + playback progress + view
 // preferences (hidden categories, sort order), persisted alongside creds.
 import { Store } from "@tauri-apps/plugin-store"
+import { getProgressRetentionDays } from "@/scripts/lib/app-settings.js"
 
 const isTauri =
   typeof window !== "undefined" &&
@@ -9,7 +10,7 @@ const isTauri =
 const STORAGE_KEY = "xt_prefs"
 const RECENT_CAP = 30
 const PROGRESS_CAP = 200
-const PROGRESS_STALE_AFTER_MS = 90 * 24 * 60 * 60 * 1000
+const DAY_MS = 24 * 60 * 60 * 1000
 const COMPLETED_THRESHOLD = 0.95
 const EVT_FAV_CHANGED = "xt:favorites-changed"
 const EVT_REC_CHANGED = "xt:recents-changed"
@@ -606,9 +607,12 @@ export function getProgressFraction(playlistId, kind, id) {
 }
 
 function trimBucket(bucket) {
-  const cutoff = Date.now() - PROGRESS_STALE_AFTER_MS
-  for (const key of Object.keys(bucket)) {
-    if ((bucket[key]?.updatedAt || 0) < cutoff) delete bucket[key]
+  const retentionDays = getProgressRetentionDays()
+  if (retentionDays > 0) {
+    const cutoff = Date.now() - retentionDays * DAY_MS
+    for (const key of Object.keys(bucket)) {
+      if ((bucket[key]?.updatedAt || 0) < cutoff) delete bucket[key]
+    }
   }
   const keys = Object.keys(bucket)
   if (keys.length <= PROGRESS_CAP) return

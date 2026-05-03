@@ -36,6 +36,12 @@ const documentTitle = pageTitle
           document.documentElement.setAttribute("data-perf-mode", "on");
         }
 
+        var KNOWN_LOCALES = ["en","es","de","fr","pt-BR","it","ru","zh","ja"];
+        var storedLocale = localStorage.getItem("xt_locale") || "";
+        if (storedLocale && KNOWN_LOCALES.indexOf(storedLocale) !== -1) {
+          document.documentElement.setAttribute("lang", storedLocale);
+        }
+
         var currentTheme = localStorage.getItem("xt_theme") || "dark";
         if (currentTheme === "light") document.documentElement.style.colorScheme = "light";
         else if (currentTheme === "dark") document.documentElement.style.colorScheme = "dark";
