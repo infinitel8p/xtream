@@ -1,6 +1,6 @@
 // Shared catalog fetch + parse + cache
 
-import { cachedFetch } from "@/scripts/lib/cache.js"
+import { cachedFetch, getCached, hydrate as hydrateCache } from "@/scripts/lib/cache.js"
 import {
   loadCreds,
   buildApiUrl,
@@ -317,29 +317,49 @@ export async function warmupActive(playlistId, opts = {}) {
 
   const run = (async () => {
     const errors = {}
-    dispatch(EVT_WARMING_START, { playlistId: pid, kinds: ["live", "vod", "series"] })
+    const force = !!opts.force
+    const isM3U = isLikelyM3USource(creds.host, creds.user, creds.pass)
+    const liveKey = isM3U ? "m3u" : "live"
+
+    await Promise.all([
+      hydrateCache(pid, liveKey),
+      hydrateCache(pid, "vod"),
+      hydrateCache(pid, "series"),
+    ])
+    const allHot =
+      !force &&
+      !!getCached(pid, liveKey) &&
+      !!getCached(pid, "vod") &&
+      !!getCached(pid, "series")
+
+    if (!allHot) {
+      dispatch(EVT_WARMING_START, { playlistId: pid, kinds: ["live", "vod", "series"] })
+    }
     const wrap = (kind, fn) =>
       fn()
         .then((data) => {
-          dispatch(EVT_WARMING_PROGRESS, {
-            playlistId: pid,
-            kind,
-            status: "done",
-            count: Array.isArray(data) ? data.length : 0,
-          })
+          if (!allHot) {
+            dispatch(EVT_WARMING_PROGRESS, {
+              playlistId: pid,
+              kind,
+              status: "done",
+              count: Array.isArray(data) ? data.length : 0,
+            })
+          }
           return data
         })
         .catch((e) => {
           errors[kind] = String(e?.message || e)
-          dispatch(EVT_WARMING_PROGRESS, {
-            playlistId: pid,
-            kind,
-            status: "error",
-            error: errors[kind],
-          })
+          if (!allHot) {
+            dispatch(EVT_WARMING_PROGRESS, {
+              playlistId: pid,
+              kind,
+              status: "error",
+              error: errors[kind],
+            })
+          }
           return []
         })
-    const force = !!opts.force
     const [live, vod, series] = await Promise.all([
       wrap("live", () => ensureLive(creds, pid, { force })),
       wrap("vod", () => ensureVod(creds, pid, { force })),
