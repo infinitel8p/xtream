@@ -339,6 +339,10 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
               id="settings-download-concurrency-cap"
               class="text-2xs text-fg-3 tabular-nums empty:hidden"
               aria-live="polite"></p>
+            <div
+              id="settings-connection-warning"
+              class="hidden rounded-xl border px-3 py-2 text-xs leading-relaxed"
+              aria-live="polite"></div>
           </div>
         </article>
 
@@ -655,6 +659,7 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
       ensureUserInfo,
       getMaxConnectionsSync,
       getActiveConnectionsSync,
+      getConnectionLimitWarning,
       USER_INFO_LOADED_EVENT,
     } from "@/scripts/lib/account-info.js"
     import { isDownloadable, scanDownloadsFolder } from "@/scripts/lib/downloads.js"
@@ -1544,6 +1549,30 @@ import FavoritesReorder from "@/components/FavoritesReorder.svelte"
             : `Provider allows ${slots}.`
         }
       }
+      // Connection limit warning
+      const active = JSON.parse(localStorage.getItem("xt_playlists") || '{"selectedId":""}')
+      const warning = getConnectionLimitWarning(active?.selectedId || "")
+      const warningEl = document.getElementById("settings-connection-warning")
+      if (warningEl) {
+        if (warning) {
+          warningEl.classList.remove("hidden")
+          const color = warning.level === "critical"
+            ? "border-bad/30 bg-bad/10 text-bad"
+            : "border-warn/30 bg-warn/10 text-warn"
+          const icon = warning.level === "critical" ? "✗" : "⚠"
+          warningEl.className = `hidden rounded-xl border px-3 py-2 text-xs leading-relaxed ${color}`
+          warningEl.innerHTML = `<span aria-hidden="true">${icon}</span> ${escapeText(warning.message)}`
+        } else {
+          warningEl.classList.add("hidden")
+          warningEl.innerHTML = ""
+        }
+      }
+    }
+
+    function escapeText(s) {
+      const d = document.createElement("div")
+      d.textContent = s
+      return d.innerHTML
     }
     syncConcurrencyButtons()
     concurrencyGroup?.addEventListener("click", (e) => {
